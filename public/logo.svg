@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
-  <title id="title">Vape Shop logo</title>
-  <desc id="desc">A neon pink vapor flame inside a black rounded square.</desc>
+  <title id="title">VapeShop logo</title>
+  <desc id="desc">A minimal neon pink vape device with vapor.</desc>
   <defs>
     <linearGradient id="glow" x1="20" y1="108" x2="105" y2="12" gradientUnits="userSpaceOnUse">
       <stop stop-color="#d4146a"/>
@@ -16,8 +16,12 @@
     </filter>
   </defs>
   <rect width="128" height="128" rx="32" fill="#050505"/>
-  <path d="M22 91h84" stroke="#ff4d8d" stroke-width="3" stroke-linecap="round" opacity=".45"/>
-  <path d="M33 88c13-8 13-21 7-31 16 6 22 17 20 28 11-10 15-24 10-42 19 13 27 30 20 45-6 14-22 22-38 18-11-3-18-9-19-18Z" fill="url(#glow)" filter="url(#softGlow)"/>
-  <path d="M61 87c-5-8-3-17 5-24 7 8 8 17 3 24" fill="#fff0f5" opacity=".9"/>
-  <circle cx="92" cy="31" r="4" fill="#ffb5d0"/>
+  <path d="M39 42c-3-9 2-17 9-22M64 39c-2-8 2-15 8-20M86 42c-1-7 3-12 8-16"
+    fill="none" stroke="#ffb5d0" stroke-linecap="round" stroke-width="5"/>
+  <rect x="37" y="46" width="54" height="54" rx="12" fill="url(#glow)" filter="url(#softGlow)"/>
+  <rect x="44" y="53" width="40" height="40" rx="7" fill="#111111"/>
+  <path d="M55 61h18v5H55z" fill="#ffb5d0"/>
+  <path d="M55 72h18v5H55z" fill="#ff4d8d"/>
+  <path d="M55 83h11v5H55z" fill="#d4146a"/>
+  <path d="M37 89h54" stroke="#ffb5d0" stroke-linecap="round" stroke-width="3"/>
 </svg>
