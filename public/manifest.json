@@ -1,3 +1,17 @@
 {
-  "name": "vape-shop"
+  "name": "Vape Shop",
+  "short_name": "Vape Shop",
+  "description": "A sharp, curated vape commerce experience.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#ff4d8d",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }

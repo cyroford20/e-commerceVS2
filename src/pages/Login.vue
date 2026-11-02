@@ -10,7 +10,7 @@
           <div class="orb orb-b"></div>
           <div class="veil"></div>
           <div class="visual-copy">
-            <p class="visual-brand">Vape Shop</p>
+            <p class="visual-brand"><img src="/logo.svg" alt="" />Vape <span>Shop</span></p>
             <p class="visual-line">Sign in. Stay sharp.</p>
           </div>
         </aside>
@@ -143,6 +143,9 @@ const handleLogin = async () => {
 }
 
 .visual-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
   margin: 0 0 0.4rem;
   font-family: 'Syne', sans-serif;
   font-size: clamp(2.2rem, 5vw, 3.4rem);
@@ -150,6 +153,17 @@ const handleLogin = async () => {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #ffffff;
+}
+
+.visual-brand img {
+  width: 0.95em;
+  height: 0.95em;
+  border-radius: 0.22em;
+  box-shadow: 0 0 20px rgba(255, 77, 141, 0.45);
+}
+
+.visual-brand span {
+  color: #ff4d8d;
 }
 
 .visual-line {

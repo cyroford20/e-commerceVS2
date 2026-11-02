@@ -7,7 +7,8 @@
 
       <ion-title>
         <router-link to="/home" class="brand-mark" v-if="!showBack">
-          <span>Vape</span><span class="accent">Shop</span>
+          <img src="/logo.svg" alt="" class="brand-logo" />
+          <span>Vape<span class="accent">Shop</span></span>
         </router-link>
         <span v-else class="page-title">{{ title }}</span>
       </ion-title>
@@ -112,6 +113,7 @@ defineExpose({ refresh });
 
 .brand-mark {
   display: inline-flex;
+  align-items: center;
   gap: 0.28em;
   font-family: 'Syne', sans-serif;
   font-weight: 800;
@@ -119,6 +121,13 @@ defineExpose({ refresh });
   text-transform: uppercase;
   color: #ffffff;
   text-decoration: none;
+}
+
+.brand-logo {
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 0.48rem;
+  box-shadow: 0 0 16px rgba(255, 77, 141, 0.35);
 }
 
 .brand-mark .accent {

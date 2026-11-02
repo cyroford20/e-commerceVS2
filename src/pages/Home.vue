@@ -23,8 +23,8 @@
 
         <div class="hero-copy">
           <p class="brand rise-in">
-            <span class="word">Vape</span>
-            <span class="word accent">Shop</span>
+            <img src="/logo.svg" alt="" class="hero-logo" />
+            <span class="word">Vape<span class="accent">Shop</span></span>
           </p>
           <div class="rule rise-in rise-in-delay-1"></div>
           <h1 class="rise-in rise-in-delay-1">Flavor, cut sharp.</h1>
@@ -346,6 +346,7 @@ onMounted(() => {
 
 .brand {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 0.22em;
   margin: 0 0 1rem;
@@ -355,6 +356,13 @@ onMounted(() => {
   letter-spacing: 0.01em;
   text-transform: uppercase;
   line-height: 0.88;
+}
+
+.hero-logo {
+  width: clamp(3rem, 11vw, 6.2rem);
+  height: clamp(3rem, 11vw, 6.2rem);
+  border-radius: 22%;
+  box-shadow: 0 0 30px rgba(255, 77, 141, 0.42);
 }
 
 .brand .word {
