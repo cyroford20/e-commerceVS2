@@ -326,3 +326,18 @@ The backend accepts Neon's pooled `DATABASE_URL` automatically. Run `neon deploy
 to pull the linked branch variables into the ignored root `.env.local`, then expose
 that variable to the backend service as `DATABASE_URL`. Local `DB_HOST`, `DB_PORT`,
 `DB_USER`, `DB_PASSWORD`, and `DB_NAME` variables remain supported as a fallback.
+
+**Deploy the backend to Render**
+
+The root `render.yaml` is a Render Blueprint for the Express API. In Render, choose
+**New → Blueprint**, connect this repository, and select `render.yaml`. After the
+service is created, add the production Neon pooled `DATABASE_URL` as a secret
+environment variable. Render generates `JWT_SECRET` automatically. Copy the
+deployed API URL, then create a root `.env` before building the mobile app:
+
+```
+VITE_API_URL=https://your-render-api.onrender.com/api
+```
+
+Run `npm run build:mobile` after changing that URL. Do not commit `.env` or any
+database credentials.
