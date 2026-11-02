@@ -1,5 +1,10 @@
 const { Pool } = require('pg');
-require('dotenv').config();
+const path = require('path');
+const dotenv = require('dotenv');
+
+// Keep backend/.env overrides while allowing local Neon variables from the project root.
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
 
 const poolConfig = process.env.DATABASE_URL
   ? {

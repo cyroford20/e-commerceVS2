@@ -326,6 +326,8 @@ The backend accepts Neon's pooled `DATABASE_URL` automatically. Run `neon deploy
 to pull the linked branch variables into the ignored root `.env.local`, then expose
 that variable to the backend service as `DATABASE_URL`. Local `DB_HOST`, `DB_PORT`,
 `DB_USER`, `DB_PASSWORD`, and `DB_NAME` variables remain supported as a fallback.
+When running locally from `backend`, the database module reads the root `.env.local`
+automatically, so `npm start` can use the linked Neon branch without copying secrets.
 
 **Deploy the backend to Render**
 
