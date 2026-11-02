@@ -23,8 +23,7 @@
 
         <div class="hero-copy">
           <p class="brand rise-in">
-            <img src="/logo.svg" alt="" class="hero-logo" />
-            <span class="word">Vape<span class="accent">Shop</span></span>
+            <img src="/logo.svg" alt="VapeShop" class="hero-logo" />
           </p>
           <div class="rule rise-in rise-in-delay-1"></div>
           <h1 class="rise-in rise-in-delay-1">Flavor, cut sharp.</h1>
@@ -363,9 +362,8 @@ onMounted(() => {
 }
 
 .hero-logo {
-  width: clamp(3rem, 11vw, 6.2rem);
-  height: clamp(3rem, 11vw, 6.2rem);
-  border-radius: 22%;
+  width: clamp(15rem, 42vw, 28rem);
+  height: auto;
   box-shadow: 0 0 30px rgba(255, 77, 141, 0.42);
 }
 

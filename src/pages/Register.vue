@@ -10,7 +10,7 @@
           <div class="orb orb-b"></div>
           <div class="veil"></div>
           <div class="visual-copy">
-            <p class="visual-brand"><img src="/logo.svg" alt="" />Vape <span>Shop</span></p>
+            <p class="visual-brand"><img src="/logo.svg" alt="VapeShop" /></p>
             <p class="visual-line">Create a customer account to shop.</p>
           </div>
         </aside>
@@ -166,9 +166,8 @@ const handleRegister = async () => {
 }
 
 .visual-brand img {
-  width: 0.95em;
-  height: 0.95em;
-  border-radius: 0.22em;
+  width: clamp(12rem, 22vw, 20rem);
+  height: auto;
   box-shadow: 0 0 20px rgba(255, 77, 141, 0.45);
 }
 
