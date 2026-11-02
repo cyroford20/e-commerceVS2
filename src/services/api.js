@@ -42,8 +42,13 @@ export const getProductById = (id) => {
 
 // ---------- ORDERS ----------
 
-export const createOrder = (items, total) => {
-  return api.post('/orders', { items, total });
+export const createOrder = (items, total, deliveryAddress, deliveryPhone) => {
+  return api.post('/orders', {
+    items,
+    total,
+    delivery_address: deliveryAddress,
+    delivery_phone: deliveryPhone,
+  });
 };
 
 export const createPosOrder = (items, customerId = null) => {
@@ -59,6 +64,63 @@ export const getUserOrders = (userId) => {
 
 export const getAllOrders = () => {
   return api.get('/orders');
+};
+
+export const getDeliveryPersons = () => {
+  return api.get('/auth/delivery-persons');
+};
+
+export const createDeliveryPerson = (name, email, password) => {
+  return api.post('/auth/delivery-persons', { name, email, password });
+};
+
+export const updateDelivery = (orderId, status, deliveryPersonId) => {
+  return api.put(`/orders/${orderId}/delivery`, {
+    status,
+    delivery_person_id: deliveryPersonId || null,
+  });
+};
+
+export const getAssignedDeliveries = () => {
+  return api.get('/orders/assigned');
+};
+
+export const acceptAssignedDelivery = (orderId) => {
+  return api.put(`/orders/${orderId}/accept`);
+};
+
+export const updateDeliveryLocation = (orderId, latitude, longitude, accuracy) => {
+  return api.put(`/orders/${orderId}/delivery-location`, {
+    latitude,
+    longitude,
+    accuracy,
+  });
+};
+
+export const getDeliveryLocation = (orderId) => {
+  return api.get(`/orders/${orderId}/delivery-location`);
+};
+
+export const updateAssignedDelivery = (
+  orderId,
+  status,
+  recipientName = null,
+  proofConfirmed = false,
+  proofPhoto = null
+) => {
+  const body = new FormData();
+  body.append('status', status);
+  body.append('recipient_name', recipientName || '');
+  body.append('proof_confirmed', String(proofConfirmed));
+  if (proofPhoto) body.append('proof_photo', proofPhoto);
+  return api.put(`/orders/${orderId}/delivery-status`, body);
+};
+
+export const getProofPhoto = async (eventId) => {
+  const response = await api.get(`/orders/proof/${eventId}`, {
+    responseType: 'blob',
+  });
+  return URL.createObjectURL(response.data);
 };
 
 export const getMe = () => {
@@ -119,7 +181,9 @@ export const isStoreOwner = () => {
 };
 
 export const homeForRole = (role) => {
-  return role === 'store-owner' ? '/store' : '/home';
+  if (role === 'store-owner') return '/store';
+  if (role === 'delivery-person') return '/delivery';
+  return '/home';
 };
 
 // ---------- CART HELPERS (localStorage) ----------

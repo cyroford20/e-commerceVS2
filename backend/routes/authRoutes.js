@@ -23,4 +23,18 @@ router.get(
   authController.listCustomers
 );
 
+router.get(
+  '/delivery-persons',
+  authenticate,
+  requireRole('store-owner'),
+  authController.listDeliveryPersons
+);
+
+router.post(
+  '/delivery-persons',
+  authenticate,
+  requireRole('store-owner'),
+  authController.createDeliveryPerson
+);
+
 module.exports = router;

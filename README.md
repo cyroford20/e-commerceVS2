@@ -219,7 +219,62 @@ Cart is also stored in `localStorage` (no backend needed until checkout).
 
 ---
 
-## 6. Requirements
+## 6. Custom vape builder
+
+Customers can open **Build your vape** from the home page and assemble a setup from available catalog inventory:
+
+- Device / pod kit
+- E-liquid
+- Optional coil
+- Optional accessory
+
+Required parts must be selected before the build can be added. Each selected component is added as its own cart item so the existing checkout, stock, and order-item tracking remain accurate. Component groups are inferred from product categories, so use categories such as `Pod System`, `E-Liquid`, `Salt Nic`, `Coils`, and `Accessories` when creating products.
+
+---
+
+## 7. Delivery management
+
+Customers enter a delivery phone number and complete address during checkout. Store owners can open **Store → Delivery** to assign a courier and update the status:
+
+- Pending
+- Assigned
+- Out for delivery
+- Delivered
+- Cancelled
+
+The status, address, phone number, and assigned courier are shown in the customer's order history. The delivery columns are added by `database/schema.sql`; re-run that script for an existing database.
+
+Store owners can create courier accounts from **Store → Delivery**. Couriers sign in at the normal login page and are redirected to `/delivery`, where they can only view assigned orders and update their own delivery status.
+
+Every delivery change is recorded in a chronological timeline visible to the customer, store owner, and assigned courier.
+
+Couriers must enter the recipient's name and explicitly confirm the handover before an order can be marked delivered.
+
+Couriers can accept assigned orders from the delivery dashboard before starting the trip. The dashboard also shows simple assigned, active, delivered, and delivered-today counts.
+
+Couriers may also attach one JPEG, PNG, or WebP proof photo when confirming delivery. Photos are limited to 5 MB, stored outside public assets, and can only be retrieved by the order customer, store owner, or assigned courier.
+
+When a courier changes an assigned order to **Out for delivery**, the delivery dashboard asks for explicit consent before requesting browser location permission and shares the courier's GPS position every 10 seconds. Customer and owner delivery pages refresh location data every 15 seconds and can open a Google Maps route using the courier's last location and the delivery address. Only the latest location is retained, and updates older than two minutes are shown as stale. Location sharing stops when the order is delivered, cancelled, unassigned, or the courier leaves the dashboard. Google Maps API keys are not required because the app opens Google Maps directions links instead of embedding the Google Maps JavaScript SDK.
+
+Customer order tracking also includes a key-free OpenStreetMap/Leaflet map. It displays the latest courier marker, geocodes the delivery address to a destination marker, and draws a straight-line progress guide between them. The map refreshes with the existing 15-second order polling, while Google Maps remains available for turn-by-turn navigation.
+
+### Optional embedded Google Maps setup
+
+The current implementation intentionally keeps the no-key Google Maps directions-link fallback. To enable an embedded map later:
+
+1. In Google Cloud Console, create or select the project used by the app and enable **Maps JavaScript API** and **Routes API** only.
+2. Create a browser API key and restrict it to:
+   - `http://localhost:8100/*`
+   - the production frontend origin when it is deployed (the production domain is not configured yet)
+3. Set the daily quota for the enabled APIs to **300 requests per day** (or lower).
+4. Create a billing budget alert for the project. Google Cloud billing must be enabled even when usage stays within the applicable free allowance.
+5. Add the key only to the local/deployment environment as `VITE_GOOGLE_MAPS_API_KEY`; never commit it.
+
+If the key is missing or the embedded map cannot load, users should continue using the existing **Open route in Google Maps** links.
+
+---
+
+## 8. Requirements
 
 - Node.js 18+
 - PostgreSQL 14+
@@ -238,7 +293,7 @@ Cart is also stored in `localStorage` (no backend needed until checkout).
 
 ---
 
-## 7. Mobile (Capacitor) + GitHub Actions
+## 8. Mobile (Capacitor) + GitHub Actions
 
 Native projects live in `android/` and `ios/`.
 

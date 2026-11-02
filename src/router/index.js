@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from '@ionic/vue-router';
-import { getUser, isLoggedIn } from '../services/api';
+import { getUser, isLoggedIn, homeForRole } from '../services/api';
 
 import Login from '../pages/Login.vue';
 import Register from '../pages/Register.vue';
@@ -10,6 +10,8 @@ import Checkout from '../pages/Checkout.vue';
 import Orders from '../pages/Orders.vue';
 import Profile from '../pages/Profile.vue';
 import Store from '../pages/Store.vue';
+import Delivery from '../pages/Delivery.vue';
+import Customize from '../pages/Customize.vue';
 
 const routes = [
   {
@@ -35,6 +37,11 @@ const routes = [
     path: '/product/:id',
     name: 'ProductDetails',
     component: ProductDetails,
+  },
+  {
+    path: '/customize',
+    name: 'Customize',
+    component: Customize,
   },
   {
     path: '/cart',
@@ -66,6 +73,12 @@ const routes = [
     component: Store,
     meta: { requiresAuth: true, role: 'store-owner' },
   },
+  {
+    path: '/delivery',
+    name: 'Delivery',
+    component: Delivery,
+    meta: { requiresAuth: true, role: 'delivery-person' },
+  },
 ];
 
 const router = createRouter({
@@ -84,7 +97,7 @@ router.beforeEach((to, from, next) => {
   }
 
   if (to.meta.role && user?.role !== to.meta.role) {
-    next(user?.role === 'store-owner' ? '/store' : '/home');
+    next(homeForRole(user?.role));
     return;
   }
 

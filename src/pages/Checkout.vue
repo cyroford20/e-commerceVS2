@@ -12,6 +12,22 @@
         <p class="eyebrow">Checkout</p>
         <h2>Order summary</h2>
 
+        <div class="delivery-form">
+          <h3>Delivery details</h3>
+          <label>
+            Phone number
+            <input v-model="deliveryPhone" type="tel" placeholder="09XXXXXXXXX" />
+          </label>
+          <label>
+            Complete address
+            <textarea
+              v-model="deliveryAddress"
+              rows="3"
+              placeholder="House number, street, barangay, city"
+            ></textarea>
+          </label>
+        </div>
+
         <ion-list>
           <ion-item v-for="item in cart" :key="item.id">
             <ion-label>
@@ -81,12 +97,18 @@ const cart = ref([]);
 const loading = ref(false);
 const error = ref('');
 const successToast = ref(false);
+const deliveryPhone = ref('');
+const deliveryAddress = ref('');
 
 const total = computed(() => getCartTotal());
 const formatPrice = (price) => parseFloat(price).toFixed(2);
 
 const placeOrder = async () => {
   error.value = '';
+  if (deliveryPhone.value.trim().length < 7 || deliveryAddress.value.trim().length < 10) {
+    error.value = 'Enter a valid phone number and complete delivery address.';
+    return;
+  }
   loading.value = true;
 
   try {
@@ -97,7 +119,12 @@ const placeOrder = async () => {
       price: item.price,
     }));
 
-    await createOrder(items, total.value);
+    await createOrder(
+      items,
+      total.value,
+      deliveryAddress.value.trim(),
+      deliveryPhone.value.trim()
+    );
 
     clearCart();
     cart.value = [];
@@ -155,6 +182,40 @@ h2 {
 ion-button {
   --background: #0a0a0a;
   height: 48px;
+}
+
+.delivery-form {
+  display: grid;
+  gap: 0.85rem;
+  margin: 1.25rem 0;
+  padding: 1rem;
+  border: 1px solid #f3d6e3;
+  border-radius: 16px;
+  background: #fffafd;
+}
+
+.delivery-form h3 {
+  margin: 0;
+}
+
+.delivery-form label {
+  display: grid;
+  gap: 0.35rem;
+  color: #5c5c5c;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.delivery-form input,
+.delivery-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.75rem;
+  border: 1px solid #e8c8d8;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #161616;
+  font: inherit;
 }
 
 .error-msg {

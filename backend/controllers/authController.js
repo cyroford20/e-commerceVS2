@@ -130,4 +130,46 @@ const listCustomers = async (req, res) => {
   }
 };
 
-module.exports = { register, login, me, updateMe, listCustomers };
+const listDeliveryPersons = async (req, res) => {
+  try {
+    res.json(await userModel.listDeliveryPersons());
+  } catch (error) {
+    console.error('List delivery persons error:', error);
+    res.status(500).json({ message: 'Server error fetching delivery persons.' });
+  }
+};
+
+const createDeliveryPerson = async (req, res) => {
+  try {
+    const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
+
+    if (!name || !email || password.length < 8) {
+      return res.status(400).json({
+        message: 'Name, email, and a password of at least 8 characters are required.',
+      });
+    }
+
+    if (await userModel.findByEmail(email)) {
+      return res.status(400).json({ message: 'Email already registered.' });
+    }
+
+    const hash = await bcrypt.hash(password, 10);
+    const person = await userModel.create(name, email, hash, 'delivery-person');
+    res.status(201).json({ user: publicUser(person) });
+  } catch (error) {
+    console.error('Create delivery person error:', error);
+    res.status(500).json({ message: 'Server error creating delivery account.' });
+  }
+};
+
+module.exports = {
+  register,
+  login,
+  me,
+  updateMe,
+  listCustomers,
+  listDeliveryPersons,
+  createDeliveryPerson,
+};

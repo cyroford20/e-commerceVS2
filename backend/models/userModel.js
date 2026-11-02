@@ -59,6 +59,16 @@ const listCustomers = async () => {
   return result.rows;
 };
 
+const listDeliveryPersons = async () => {
+  const result = await pool.query(
+    `SELECT id, name, email
+     FROM users
+     WHERE role = 'delivery-person'
+     ORDER BY name ASC`
+  );
+  return result.rows;
+};
+
 // Shared walk-in account used by in-store POS sales
 const ensureWalkInCustomer = async () => {
   const existing = await findByEmail(WALKIN_EMAIL);
@@ -77,5 +87,6 @@ module.exports = {
   create,
   updateProfile,
   listCustomers,
+  listDeliveryPersons,
   ensureWalkInCustomer,
 };

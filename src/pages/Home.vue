@@ -36,6 +36,9 @@
               <span>Shop catalog</span>
               <span class="cta-glow"></span>
             </button>
+            <button type="button" class="cta-btn outline" @click="goCustomize">
+              Build your vape
+            </button>
             <template v-if="!loggedIn">
               <button type="button" class="cta-btn ghost" @click="goLogin">
                 Login
@@ -187,6 +190,7 @@ const scrollToCatalog = () => {
 
 const goLogin = () => router.push('/login');
 const goRegister = () => router.push('/register');
+const goCustomize = () => router.push('/customize');
 
 const onHeroPointer = (event) => {
   const rect = event.currentTarget.getBoundingClientRect();

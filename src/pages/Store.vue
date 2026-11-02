@@ -37,6 +37,11 @@
               <span>Orders</span>
               <em>{{ orders.length }}</em>
             </button>
+            <button type="button" :class="{ active: tab === 'delivery' }" @click="tab = 'delivery'">
+              <span class="nav-ico"><ion-icon :icon="navigateOutline"></ion-icon></span>
+              <span>Delivery</span>
+              <em>{{ deliveryQueue.length }}</em>
+            </button>
             <button type="button" :class="{ active: tab === 'customers' }" @click="tab = 'customers'">
               <span class="nav-ico"><ion-icon :icon="peopleOutline"></ion-icon></span>
               <span>Customers</span>
@@ -464,6 +469,124 @@
             </div>
           </section>
 
+          <section v-if="tab === 'delivery'" class="view">
+            <div class="panel glass">
+              <div class="panel-head">
+                <div>
+                  <h3>Delivery queue</h3>
+                  <p class="muted">{{ deliveryQueue.length }} online deliveries</p>
+                </div>
+              </div>
+              <div v-if="deliveryQueue.length" class="delivery-analytics" aria-label="Delivery analytics">
+                <div class="delivery-analytics-card">
+                  <strong>{{ deliveryAnalytics.total }}</strong>
+                  <span>Total</span>
+                </div>
+                <div class="delivery-analytics-card">
+                  <strong>{{ deliveryAnalytics.unassigned }}</strong>
+                  <span>Unassigned</span>
+                </div>
+                <div class="delivery-analytics-card">
+                  <strong>{{ deliveryAnalytics.active }}</strong>
+                  <span>Active</span>
+                </div>
+                <div class="delivery-analytics-card">
+                  <strong>{{ deliveryAnalytics.delivered }}</strong>
+                  <span>Delivered</span>
+                </div>
+                <div class="delivery-analytics-card">
+                  <strong>{{ deliveryAnalytics.completionRate }}%</strong>
+                  <span>Completion rate</span>
+                </div>
+              </div>
+              <div v-if="deliveryQueue.length === 0" class="panel-empty">
+                No online deliveries are waiting.
+              </div>
+              <div v-else class="delivery-cards">
+                <article class="delivery-card" v-for="order in deliveryQueue" :key="order.id">
+                  <div class="delivery-card-top">
+                    <div>
+                      <p class="order-id">Order #{{ order.id }}</p>
+                      <strong>{{ order.customer_name }}</strong>
+                      <span class="muted">{{ order.customer_email }}</span>
+                    </div>
+                    <strong class="price-text">₱{{ formatPrice(order.total) }}</strong>
+                  </div>
+                  <div class="delivery-address">
+                    <strong>Deliver to</strong>
+                    <span>{{ order.delivery_address || 'Address not provided' }}</span>
+                    <span>{{ order.delivery_phone || 'No phone number' }}</span>
+                    <a
+                      v-if="order.delivery_location"
+                      :href="googleMapsLink(order)"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Open live route in Google Maps
+                    </a>
+                    <small v-if="order.delivery_location">
+                      Courier location updated {{ formatDate(order.delivery_location.recorded_at) }}
+                      <span v-if="isLocationStale(order.delivery_location)"> · Stale</span>
+                    </small>
+                  </div>
+                  <div class="delivery-actions">
+                    <select v-model="deliveryAssignments[order.id]">
+                      <option value="">Unassigned</option>
+                      <option
+                        v-for="person in deliveryPersons"
+                        :key="person.id"
+                        :value="String(person.id)"
+                      >
+                        {{ person.name }}
+                      </option>
+                    </select>
+                    <select v-model="deliveryStatuses[order.id]">
+                      <option value="pending">Pending</option>
+                      <option value="assigned">Assigned</option>
+                      <option value="out_for_delivery">Out for delivery</option>
+                      <option value="delivered">Delivered</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                    <button type="button" class="primary-btn" @click="saveDelivery(order)">
+                      Save
+                    </button>
+                  </div>
+                  <div v-if="order.delivery_timeline?.length" class="delivery-timeline">
+                    <strong>Timeline</strong>
+                    <span v-for="event in order.delivery_timeline" :key="event.id">
+                      {{ formatStatus(event.status) }}
+                      <span v-if="event.recipient_name"> · Received by {{ event.recipient_name }}</span>
+                      · {{ formatDate(event.created_at) }}
+                    </span>
+                  </div>
+                </article>
+              </div>
+            </div>
+            <div class="panel glass courier-panel">
+              <div class="panel-head">
+                <div>
+                  <h3>Courier accounts</h3>
+                  <p class="muted">Create accounts for delivery staff.</p>
+                </div>
+              </div>
+              <form class="courier-form" @submit.prevent="createCourier">
+                <input v-model="newCourier.name" required placeholder="Full name" />
+                <input v-model="newCourier.email" required type="email" placeholder="Email" />
+                <input
+                  v-model="newCourier.password"
+                  required
+                  minlength="8"
+                  type="password"
+                  placeholder="Password (8+ characters)"
+                />
+                <button type="submit" class="primary-btn" :disabled="creatingCourier">
+                  {{ creatingCourier ? 'Creating...' : 'Create courier' }}
+                </button>
+              </form>
+              <p v-if="courierMessage" class="muted courier-message">{{ courierMessage }}</p>
+            </div>
+          </section>
+
           <section v-if="tab === 'customers'" class="view">
             <div class="panel glass">
               <div class="panel-head">
@@ -545,7 +668,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent, IonIcon } from '@ionic/vue';
 import {
@@ -561,6 +684,7 @@ import {
   peopleOutline,
   personOutline,
   storefrontOutline,
+  navigateOutline,
 } from 'ionicons/icons';
 import {
   getMe,
@@ -572,6 +696,9 @@ import {
   updateProduct,
   deleteProduct,
   createPosOrder,
+  updateDelivery,
+  getDeliveryPersons,
+  createDeliveryPerson,
   saveAuth,
   getToken,
   logout,
@@ -605,17 +732,25 @@ const profile = ref(null);
 const products = ref([]);
 const orders = ref([]);
 const customers = ref([]);
+const deliveryPersons = ref([]);
+const deliveryAssignments = ref({});
+const deliveryStatuses = ref({});
+const newCourier = ref({ name: '', email: '', password: '' });
+const creatingCourier = ref(false);
+const courierMessage = ref('');
 const loading = ref(true);
 const saving = ref(false);
 const editing = ref(false);
 const form = ref(emptyForm());
 const formError = ref('');
 const error = ref('');
+let deliveryRefreshTimer;
 
 const pageTitle = computed(() => {
   if (tab.value === 'products') return 'Products';
   if (tab.value === 'pos') return 'Point of Sale';
   if (tab.value === 'orders') return 'Orders';
+  if (tab.value === 'delivery') return 'Delivery';
   if (tab.value === 'customers') return 'Customers';
   if (tab.value === 'profile') return 'Profile';
   return 'Dashboard';
@@ -625,6 +760,7 @@ const pageSubhead = computed(() => {
   if (tab.value === 'products') return 'Control pricing, stock, and media for every SKU.';
   if (tab.value === 'pos') return 'Ring up walk-in sales and sync stock instantly.';
   if (tab.value === 'orders') return 'Track every customer checkout in one place.';
+  if (tab.value === 'delivery') return 'Assign couriers and keep customers updated.';
   if (tab.value === 'customers') return 'See every shopper account and their spend.';
   if (tab.value === 'profile') return 'Update your store owner display details.';
   return 'A clear snapshot of catalog health and sales.';
@@ -672,6 +808,28 @@ const lowStockCount = computed(() =>
 );
 
 const recentOrders = computed(() => orders.value.slice(0, 5));
+
+const deliveryQueue = computed(() =>
+  orders.value.filter((order) => order.channel === 'online')
+);
+
+const deliveryAnalytics = computed(() => {
+  const total = deliveryQueue.value.length;
+  const delivered = deliveryQueue.value.filter(
+    (order) => order.delivery_status === 'delivered'
+  ).length;
+  return {
+    total,
+    unassigned: deliveryQueue.value.filter(
+      (order) => !order.delivery_person_id && order.delivery_status !== 'delivered'
+    ).length,
+    active: deliveryQueue.value.filter(
+      (order) => order.delivery_status === 'out_for_delivery'
+    ).length,
+    delivered,
+    completionRate: total ? Math.round((delivered / total) * 100) : 0,
+  };
+});
 
 const filteredProducts = computed(() => {
   const q = productQuery.value.trim().toLowerCase();
@@ -782,15 +940,32 @@ const formatDate = (dateStr) => {
   });
 };
 
+const formatStatus = (status) =>
+  (status || 'pending')
+    .split('_')
+    .map((word) => word[0].toUpperCase() + word.slice(1))
+    .join(' ');
+
+const googleMapsLink = (order) => {
+  const destination = encodeURIComponent(order.delivery_address || '');
+  const location = order.delivery_location;
+  const origin = location ? `&origin=${location.latitude},${location.longitude}` : '';
+  return `https://www.google.com/maps/dir/?api=1&destination=${destination}${origin}`;
+};
+
+const isLocationStale = (location) =>
+  Date.now() - new Date(location.recorded_at).getTime() > 120000;
+
 const loadStore = async () => {
   loading.value = true;
   error.value = '';
   try {
-    const [me, catalog, orderList, customerList] = await Promise.all([
+    const [me, catalog, orderList, customerList, courierList] = await Promise.all([
       getMe(),
       getProducts(),
       getAllOrders(),
       getCustomers(),
+      getDeliveryPersons(),
     ]);
     profile.value = me.data;
     ownerName.value = me.data.name || '';
@@ -799,10 +974,54 @@ const loadStore = async () => {
     products.value = catalog.data;
     orders.value = orderList.data;
     customers.value = customerList.data;
+    deliveryPersons.value = courierList.data;
+    deliveryAssignments.value = Object.fromEntries(
+      orders.value.map((order) => [order.id, String(order.delivery_person_id || '')])
+    );
+    deliveryStatuses.value = Object.fromEntries(
+      orders.value.map((order) => [order.id, order.delivery_status || 'pending'])
+    );
   } catch (err) {
     error.value = err.response?.data?.message || 'Could not load the store.';
   } finally {
     loading.value = false;
+  }
+};
+
+const createCourier = async () => {
+  creatingCourier.value = true;
+  courierMessage.value = '';
+  try {
+    const response = await createDeliveryPerson(
+      newCourier.value.name.trim(),
+      newCourier.value.email.trim(),
+      newCourier.value.password
+    );
+    deliveryPersons.value = [...deliveryPersons.value, response.data.user].sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
+    newCourier.value = { name: '', email: '', password: '' };
+    courierMessage.value = 'Courier account created.';
+  } catch (err) {
+    courierMessage.value =
+      err.response?.data?.message || 'Could not create courier account.';
+  } finally {
+    creatingCourier.value = false;
+  }
+};
+
+const saveDelivery = async (order) => {
+  error.value = '';
+  try {
+    const res = await updateDelivery(
+      order.id,
+      deliveryStatuses.value[order.id],
+      deliveryAssignments.value[order.id]
+    );
+    const index = orders.value.findIndex((item) => item.id === order.id);
+    if (index >= 0) orders.value[index] = { ...orders.value[index], ...res.data };
+  } catch (err) {
+    error.value = err.response?.data?.message || 'Could not update delivery.';
   }
 };
 
@@ -988,7 +1207,27 @@ const saveOwnerProfile = async () => {
   }
 };
 
-onMounted(loadStore);
+const refreshDeliveryQueue = async () => {
+  if (tab.value !== 'delivery') return;
+  try {
+    const response = await getAllOrders();
+    orders.value = response.data;
+    deliveryAssignments.value = Object.fromEntries(
+      orders.value.map((order) => [order.id, String(order.delivery_person_id || '')])
+    );
+    deliveryStatuses.value = Object.fromEntries(
+      orders.value.map((order) => [order.id, order.delivery_status || 'pending'])
+    );
+  } catch (err) {
+    error.value = err.response?.data?.message || 'Could not refresh deliveries.';
+  }
+};
+
+onMounted(async () => {
+  await loadStore();
+  deliveryRefreshTimer = window.setInterval(refreshDeliveryQueue, 15000);
+});
+onBeforeUnmount(() => window.clearInterval(deliveryRefreshTimer));
 </script>
 
 <style scoped>
@@ -1105,6 +1344,136 @@ onMounted(loadStore);
 
 .admin-main .muted {
   color: #8a8a8a;
+}
+
+.delivery-cards {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.delivery-analytics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.delivery-analytics-card {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.75rem;
+  border: 1px solid #eee5ea;
+  border-radius: 12px;
+  background: #fff8fb;
+}
+
+.delivery-analytics-card strong {
+  color: #d4146a;
+  font-size: 1.25rem;
+}
+
+.delivery-analytics-card span {
+  color: #777;
+  font-size: 0.72rem;
+}
+
+.delivery-card {
+  padding: 1rem;
+  border: 1px solid #e8e1e6;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.delivery-card-top,
+.delivery-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.delivery-card-top {
+  margin-bottom: 0.85rem;
+}
+
+.delivery-address {
+  display: grid;
+  gap: 0.2rem;
+  margin-bottom: 0.9rem;
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: #fff5f9;
+  color: #5c5c5c;
+  font-size: 0.85rem;
+}
+
+.delivery-address strong {
+  color: #161616;
+}
+
+.delivery-actions input,
+.delivery-actions select {
+  min-width: 0;
+  flex: 1;
+  padding: 0.65rem;
+  border: 1px solid #e8e1e6;
+  border-radius: 9px;
+  background: #fff;
+  color: #161616;
+  font: inherit;
+}
+
+.delivery-timeline {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #eee5ea;
+  color: #777;
+  font-size: 0.78rem;
+}
+
+.delivery-timeline strong {
+  color: #161616;
+}
+
+.courier-panel {
+  margin-top: 1rem;
+}
+
+.courier-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.courier-form input {
+  min-width: 0;
+  padding: 0.65rem;
+  border: 1px solid #e8e1e6;
+  border-radius: 9px;
+  background: #fff;
+  color: #161616;
+  font: inherit;
+}
+
+.courier-message {
+  margin: 0.75rem 0 0;
+}
+
+@media (max-width: 700px) {
+  .delivery-analytics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .delivery-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .courier-form {
+    grid-template-columns: 1fr;
+  }
 }
 
 .side-nav {
