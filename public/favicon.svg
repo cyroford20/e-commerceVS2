@@ -1,6 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <rect width="128" height="128" rx="32" fill="#050505"/>
-  <path d="M22 91h84" stroke="#ff4d8d" stroke-width="3" stroke-linecap="round" opacity=".45"/>
-  <path d="M33 88c13-8 13-21 7-31 16 6 22 17 20 28 11-10 15-24 10-42 19 13 27 30 20 45-6 14-22 22-38 18-11-3-18-9-19-18Z" fill="#ff4d8d"/>
-  <path d="M61 87c-5-8-3-17 5-24 7 8 8 17 3 24" fill="#fff0f5"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title">
+  <title id="title">VapeShop</title>
+  <defs>
+    <linearGradient id="body" x1="55" y1="35" x2="205" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#34343a"/>
+      <stop offset=".5" stop-color="#111116"/>
+      <stop offset="1" stop-color="#050506"/>
+    </linearGradient>
+    <linearGradient id="pink" x1="55" y1="0" x2="201" y2="0">
+      <stop stop-color="#d4146a"/>
+      <stop offset=".5" stop-color="#ff4d8d"/>
+      <stop offset="1" stop-color="#ffb5d0"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="54" fill="#050505"/>
+  <path d="M104 67V37c0-16 11-27 24-27s24 11 24 27v30" fill="#1b1b20" stroke="#ffb5d0" stroke-width="7"/>
+  <rect x="58" y="56" width="140" height="164" rx="28" fill="url(#body)" stroke="#4b4b55" stroke-width="5"/>
+  <rect x="72" y="74" width="112" height="120" rx="15" fill="#09090d" stroke="#272731" stroke-width="3"/>
+  <rect x="88" y="92" width="80" height="43" rx="8" fill="#17171d"/>
+  <rect x="98" y="102" width="60" height="6" rx="3" fill="#ff4d8d"/>
+  <rect x="98" y="116" width="41" height="6" rx="3" fill="#ffb5d0"/>
+  <circle cx="158" cy="159" r="8" fill="#ff4d8d"/>
+  <path d="M75 199h106" stroke="url(#pink)" stroke-width="8" stroke-linecap="round"/>
+  <path d="M69 64h118" stroke="#ff4d8d" stroke-width="5" opacity=".8"/>
 </svg>
