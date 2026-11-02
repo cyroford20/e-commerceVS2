@@ -319,3 +319,10 @@ Android emulator can use `http://10.0.2.2:3000/api` to reach a host machine back
 - `.github/workflows/ios.yml` → builds an **iOS Simulator** `.app` (no App Store signing)
 
 Optional repo variable: `VITE_API_URL` (Settings → Variables).
+
+**Neon database**
+
+The backend accepts Neon's pooled `DATABASE_URL` automatically. Run `neon deploy`
+to pull the linked branch variables into the ignored root `.env.local`, then expose
+that variable to the backend service as `DATABASE_URL`. Local `DB_HOST`, `DB_PORT`,
+`DB_USER`, `DB_PASSWORD`, and `DB_NAME` variables remain supported as a fallback.
