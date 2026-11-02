@@ -1,11 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 160" role="img" aria-labelledby="title desc">
-  <title id="title">VapeShop V pod logo</title>
-  <desc id="desc">A neon pod vape device with a white V mark.</desc>
+  <title id="title">VapeShop device logo</title>
+  <desc id="desc">A realistic neon vape device icon.</desc>
   <defs>
-    <linearGradient id="pink" x1="20" y1="20" x2="130" y2="145" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ffb5d0"/>
+    <linearGradient id="body" x1="35" y1="30" x2="125" y2="145" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#34343a"/>
+      <stop offset=".5" stop-color="#111116"/>
+      <stop offset="1" stop-color="#050506"/>
+    </linearGradient>
+    <linearGradient id="pink" x1="35" y1="0" x2="125" y2="0">
+      <stop stop-color="#d4146a"/>
       <stop offset=".5" stop-color="#ff4d8d"/>
-      <stop offset="1" stop-color="#d4146a"/>
+      <stop offset="1" stop-color="#ffb5d0"/>
     </linearGradient>
     <filter id="glow" x="-35%" y="-35%" width="170%" height="170%">
       <feGaussianBlur stdDeviation="4" result="blur"/>
@@ -13,12 +18,15 @@
     </filter>
   </defs>
   <rect width="160" height="160" rx="40" fill="#050505"/>
-  <path d="M66 39V24c0-9 7-16 16-16s16 7 16 16v15" fill="none" stroke="#fff0f5" stroke-width="8" stroke-linecap="round"/>
-  <rect x="39" y="35" width="82" height="101" rx="19" fill="url(#pink)" filter="url(#glow)"/>
-  <rect x="49" y="47" width="62" height="76" rx="11" fill="#101010"/>
-  <path d="M62 64l15 30 15-30h10L77 108 52 64h10Z" fill="#ffffff"/>
-  <circle cx="77" cy="114" r="4" fill="#ff4d8d"/>
-  <path d="M39 112h82" stroke="#ffb5d0" stroke-width="4" stroke-linecap="round"/>
+  <path d="M66 42V23c0-10 7-18 15-18s15 8 15 18v19" fill="#1b1b20" stroke="#ffb5d0" stroke-width="4"/>
+  <rect x="36" y="35" width="90" height="103" rx="18" fill="url(#body)" stroke="#4b4b55" stroke-width="3"/>
+  <rect x="45" y="46" width="72" height="75" rx="10" fill="#09090d" stroke="#272731" stroke-width="2"/>
+  <rect x="55" y="57" width="52" height="27" rx="5" fill="#17171d"/>
+  <rect x="61" y="63" width="40" height="4" rx="2" fill="#ff4d8d"/>
+  <rect x="61" y="72" width="27" height="4" rx="2" fill="#ffb5d0"/>
+  <circle cx="101" cy="99" r="5" fill="#ff4d8d" filter="url(#glow)"/>
+  <path d="M47 125h68" stroke="url(#pink)" stroke-width="5" stroke-linecap="round"/>
+  <path d="M43 40h76" stroke="#ff4d8d" stroke-width="3" opacity=".8"/>
   <text x="190" y="101" fill="#ffffff" font-family="Arial, sans-serif" font-size="54" font-weight="800" letter-spacing="1">Vape<tspan fill="#ff4d8d">Shop</tspan></text>
-  <text x="194" y="129" fill="#ffb5d0" font-family="Arial, sans-serif" font-size="13" font-weight="700" letter-spacing="5">POD VAPE</text>
+  <text x="194" y="129" fill="#ffb5d0" font-family="Arial, sans-serif" font-size="13" font-weight="700" letter-spacing="5">VAPE DEVICE</text>
 </svg>

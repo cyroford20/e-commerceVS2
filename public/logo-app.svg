@@ -1,23 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
-  <title id="title">VapeShop V pod app icon</title>
-  <desc id="desc">A neon pod vape device with a white V mark.</desc>
+  <title id="title">VapeShop device app icon</title>
+  <desc id="desc">A realistic neon vape device icon.</desc>
   <defs>
-    <linearGradient id="pink" x1="40" y1="25" x2="220" y2="225" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ffb5d0"/>
+    <linearGradient id="body" x1="55" y1="35" x2="205" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#34343a"/>
+      <stop offset=".5" stop-color="#111116"/>
+      <stop offset="1" stop-color="#050506"/>
+    </linearGradient>
+    <linearGradient id="pink" x1="55" y1="0" x2="201" y2="0">
+      <stop stop-color="#d4146a"/>
       <stop offset=".5" stop-color="#ff4d8d"/>
-      <stop offset="1" stop-color="#d4146a"/>
+      <stop offset="1" stop-color="#ffb5d0"/>
     </linearGradient>
     <filter id="glow" x="-35%" y="-35%" width="170%" height="170%">
-      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feGaussianBlur stdDeviation="5" result="blur"/>
       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
   <rect width="256" height="256" rx="54" fill="#050505"/>
-  <path d="M106 66V42c0-14 11-25 25-25s25 11 25 25v24" fill="none" stroke="#fff0f5" stroke-width="12" stroke-linecap="round"/>
-  <rect x="62" y="58" width="132" height="163" rx="30" fill="url(#pink)" filter="url(#glow)"/>
-  <rect x="78" y="78" width="100" height="122" rx="18" fill="#101010"/>
-  <path d="M99 104l29 59 29-59h16l-45 82-45-82h16Z" fill="#ffffff"/>
-  <circle cx="128" cy="185" r="6" fill="#ff4d8d"/>
-  <path d="M62 183h132" stroke="#ffb5d0" stroke-width="7" stroke-linecap="round"/>
-  <text x="128" y="242" fill="#ff4d8d" font-family="Arial, sans-serif" font-size="22" font-weight="800" text-anchor="middle">VAPESHOP</text>
+  <path d="M104 67V37c0-16 11-27 24-27s24 11 24 27v30" fill="#1b1b20" stroke="#ffb5d0" stroke-width="7"/>
+  <rect x="58" y="56" width="140" height="164" rx="28" fill="url(#body)" stroke="#4b4b55" stroke-width="5"/>
+  <rect x="72" y="74" width="112" height="120" rx="15" fill="#09090d" stroke="#272731" stroke-width="3"/>
+  <rect x="88" y="92" width="80" height="43" rx="8" fill="#17171d"/>
+  <rect x="98" y="102" width="60" height="6" rx="3" fill="#ff4d8d"/>
+  <rect x="98" y="116" width="41" height="6" rx="3" fill="#ffb5d0"/>
+  <circle cx="158" cy="159" r="8" fill="#ff4d8d" filter="url(#glow)"/>
+  <path d="M75 199h106" stroke="url(#pink)" stroke-width="8" stroke-linecap="round"/>
+  <path d="M69 64h118" stroke="#ff4d8d" stroke-width="5" opacity=".8"/>
+  <path d="M102 32c-2-9 2-17 8-23M137 29c0-8 4-14 10-19" fill="none" stroke="#fff0f5" stroke-width="6" stroke-linecap="round" opacity=".85"/>
 </svg>
