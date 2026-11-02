@@ -1,28 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 128" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 160" role="img" aria-labelledby="title desc">
   <title id="title">VapeShop logo</title>
-  <desc id="desc">A minimal neon pink vape device with vapor.</desc>
+  <desc id="desc">A neon vape cloud forming a V beside the VapeShop wordmark.</desc>
   <defs>
-    <linearGradient id="glow" x1="20" y1="108" x2="105" y2="12" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#d4146a"/>
-      <stop offset=".55" stop-color="#ff4d8d"/>
-      <stop offset="1" stop-color="#ffb5d0"/>
+    <linearGradient id="pink" x1="20" y1="25" x2="135" y2="135" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffb5d0"/>
+      <stop offset=".5" stop-color="#ff4d8d"/>
+      <stop offset="1" stop-color="#d4146a"/>
     </linearGradient>
-    <filter id="softGlow" x="-35%" y="-35%" width="170%" height="170%">
-      <feGaussianBlur stdDeviation="3.5" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
+    <filter id="glow" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
-  <rect width="128" height="128" rx="32" fill="#050505"/>
-  <path d="M39 42c-3-9 2-17 9-22M64 39c-2-8 2-15 8-20M86 42c-1-7 3-12 8-16"
-    fill="none" stroke="#ffb5d0" stroke-linecap="round" stroke-width="5"/>
-  <rect x="37" y="46" width="54" height="54" rx="12" fill="url(#glow)" filter="url(#softGlow)"/>
-  <rect x="44" y="53" width="40" height="40" rx="7" fill="#111111"/>
-  <path d="M55 61h18v5H55z" fill="#ffb5d0"/>
-  <path d="M55 72h18v5H55z" fill="#ff4d8d"/>
-  <path d="M55 83h11v5H55z" fill="#d4146a"/>
-  <path d="M37 89h54" stroke="#ffb5d0" stroke-linecap="round" stroke-width="3"/>
-  <text x="154" y="78" fill="#ffffff" font-family="Arial, sans-serif" font-size="42" font-weight="800" letter-spacing="1">Vape<tspan fill="#ff4d8d">Shop</tspan></text>
+  <rect width="160" height="160" rx="40" fill="#050505"/>
+  <path d="M37 45c-8-17 1-30 17-36M72 38c-4-15 4-27 17-34M108 45c-2-12 5-22 17-28"
+    fill="none" stroke="#fff0f5" stroke-linecap="round" stroke-width="8" opacity=".92"/>
+  <path d="M30 59c13-8 25-8 36 2 9 8 18 8 28 0 13-10 27-9 37 2 10 12 7 28-5 35-8 5-17 4-25-2-8-6-15-6-23 0-11 9-25 8-35-1-11-9-13-25-3-36Z"
+    fill="url(#pink)" filter="url(#glow)"/>
+  <path d="M43 69c10 2 18 8 24 17 7-10 15-15 25-17-4 14-13 25-25 33-11-8-20-19-24-33Z" fill="#050505"/>
+  <path d="M36 116h88" stroke="#ffb5d0" stroke-linecap="round" stroke-width="4" opacity=".8"/>
+  <text x="190" y="101" fill="#ffffff" font-family="Arial, sans-serif" font-size="54" font-weight="800" letter-spacing="1">Vape<tspan fill="#ff4d8d">Shop</tspan></text>
+  <text x="194" y="129" fill="#ffb5d0" font-family="Arial, sans-serif" font-size="13" font-weight="700" letter-spacing="5">VAPE CLOUD</text>
 </svg>

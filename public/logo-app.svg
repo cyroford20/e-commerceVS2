@@ -1,23 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
-  <title id="title">VapeShop app logo</title>
-  <desc id="desc">VapeShop wordmark with a minimal vape device and vapor.</desc>
+  <title id="title">VapeShop app icon</title>
+  <desc id="desc">A neon vape cloud forming a V with the VapeShop wordmark.</desc>
   <defs>
-    <linearGradient id="glow" x1="44" y1="170" x2="212" y2="84" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#d4146a"/>
-      <stop offset=".55" stop-color="#ff4d8d"/>
-      <stop offset="1" stop-color="#ffb5d0"/>
+    <linearGradient id="pink" x1="35" y1="35" x2="220" y2="205" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffb5d0"/>
+      <stop offset=".5" stop-color="#ff4d8d"/>
+      <stop offset="1" stop-color="#d4146a"/>
     </linearGradient>
-    <filter id="softGlow" x="-35%" y="-35%" width="170%" height="170%">
-      <feGaussianBlur stdDeviation="3.5" result="blur"/>
+    <filter id="glow" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
-  <rect width="256" height="256" rx="52" fill="#050505"/>
-  <path d="M82 61c-5-17 4-31 17-42M128 56c-3-15 4-28 15-38M169 61c-2-13 5-23 15-31"
-    fill="none" stroke="#ffb5d0" stroke-linecap="round" stroke-width="8"/>
-  <rect x="76" y="70" width="104" height="104" rx="22" fill="url(#glow)" filter="url(#softGlow)"/>
-  <rect x="89" y="83" width="78" height="78" rx="14" fill="#111111"/>
-  <path d="M108 99h40v9h-40zM108 120h40v9h-40zM108 141h24v9h-24z" fill="#ffb5d0"/>
-  <path d="M76 154h104" stroke="#ffb5d0" stroke-linecap="round" stroke-width="6"/>
-  <text x="128" y="216" fill="#ffffff" font-family="Arial, sans-serif" font-size="28" font-weight="800" text-anchor="middle">Vape<tspan fill="#ff4d8d">Shop</tspan></text>
+  <rect width="256" height="256" rx="54" fill="#050505"/>
+  <path d="M58 67c-10-22 1-39 22-47M111 58c-5-19 5-34 22-43M166 67c-3-15 6-28 22-36"
+    fill="none" stroke="#fff0f5" stroke-linecap="round" stroke-width="11"/>
+  <path d="M47 88c21-13 40-12 57 3 14 12 28 12 44 0 20-15 42-13 58 3 16 19 11 44-8 56-13 8-27 6-40-3-12-9-24-9-37 0-17 14-40 12-56-1-17-15-20-40-5-58Z"
+    fill="url(#pink)" filter="url(#glow)"/>
+  <path d="M68 104c16 3 29 13 40 27 11-15 24-24 40-27-7 22-21 39-40 52-18-13-33-30-40-52Z" fill="#050505"/>
+  <path d="M58 179h140" stroke="#ffb5d0" stroke-linecap="round" stroke-width="6" opacity=".85"/>
+  <text x="128" y="220" fill="#ffffff" font-family="Arial, sans-serif" font-size="28" font-weight="800" text-anchor="middle">Vape<tspan fill="#ff4d8d">Shop</tspan></text>
 </svg>
