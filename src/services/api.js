@@ -1,8 +1,13 @@
 import axios from 'axios';
 
-// Use VITE_API_URL for device/production builds (localhost only works on desktop)
+// A phone cannot reach the developer computer through localhost. Use the local
+// API only during Vite development and the deployed API for production builds.
+const configuredApiBase = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
 const apiBase =
-  import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:3000/api';
+  configuredApiBase ||
+  (import.meta.env.DEV
+    ? 'http://localhost:3000/api'
+    : 'https://e-commercevs2.onrender.com/api');
 
 const api = axios.create({
   baseURL: apiBase,
