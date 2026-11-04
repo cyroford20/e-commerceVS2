@@ -35,7 +35,7 @@ const formatPrice = (price) => parseFloat(price).toFixed(2);
 <style scoped>
 .cart-line {
   display: grid;
-  grid-template-columns: 88px 1fr auto;
+  grid-template-columns: 88px minmax(0, 1fr) auto;
   gap: 0.9rem;
   align-items: center;
   padding: 0.85rem;
@@ -53,6 +53,7 @@ img {
 h2 {
   margin: 0 0 0.25rem;
   font-size: 1rem;
+  overflow-wrap: anywhere;
 }
 
 .subtotal {
@@ -90,7 +91,12 @@ h2 {
 
 @media (max-width: 600px) {
   .cart-line {
-    grid-template-columns: 72px 1fr;
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+
+  img {
+    width: 72px;
+    height: 72px;
   }
 
   .qty-controls {

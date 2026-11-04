@@ -103,7 +103,7 @@ onMounted(refreshCart);
 .cart-shell {
   max-width: 720px;
   margin: 0 auto;
-  padding: 1.5rem 1.25rem 3rem;
+  padding: 1.5rem 1.25rem calc(5rem + env(safe-area-inset-bottom));
 }
 
 .cart-head h1 {
@@ -141,5 +141,16 @@ onMounted(refreshCart);
 ion-button {
   --background: #ff4d8d;
   height: 48px;
+  margin-bottom: env(safe-area-inset-bottom);
+}
+
+@media (max-width: 600px) {
+  .cart-shell {
+    padding-inline: 0.8rem;
+  }
+
+  .cart-summary {
+    padding-bottom: 1rem;
+  }
 }
 </style>

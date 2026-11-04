@@ -151,7 +151,7 @@ onMounted(() => {
 .checkout-container {
   max-width: 560px;
   margin: 0 auto;
-  padding: 1.5rem 1.25rem 3rem;
+  padding: 1.5rem 1.25rem calc(5rem + env(safe-area-inset-bottom));
 }
 
 .eyebrow {
@@ -216,6 +216,17 @@ ion-button {
   background: #ffffff;
   color: #161616;
   font: inherit;
+}
+
+@media (max-width: 600px) {
+  .checkout-container {
+    padding-inline: 0.8rem;
+  }
+
+  .checkout-container ion-button {
+    min-height: 48px;
+    margin-bottom: env(safe-area-inset-bottom);
+  }
 }
 
 .error-msg {
