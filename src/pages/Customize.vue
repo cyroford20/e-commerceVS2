@@ -65,27 +65,38 @@
                 </div>
                 <span class="build-progress">{{ requiredSelectedCount }}/{{ requiredGroupCount }}</span>
               </div>
-              <div class="vape-stage" aria-label="Live preview of your vape build">
+              <div
+                class="vape-stage"
+                :class="{ 'build-complete': canBuild }"
+                :style="assemblyColors"
+                aria-label="Live preview of your vape build"
+              >
                 <div class="vape-aura"></div>
-                <div class="assembly-parts">
+                <div :key="assemblyVersion" class="assembly-parts">
                   <div class="assembly-part device-part" :class="{ empty: !selected.device, 'is-active': actionPart === 'device' }">
-                    <img v-if="selected.device" :src="productImage(selected.device, 'device')" data-part="device" :alt="selected.device.name" @error="useFallbackImage" />
-                    <span v-else class="part-placeholder">Device</span>
+                    <div class="device-shell">
+                      <span class="device-screen">{{ selected.device ? 'ON' : '--' }}</span>
+                      <span class="device-button"></span>
+                      <span class="device-led"></span>
+                    </div>
                     <small>Device</small>
                   </div>
                   <div class="assembly-connector"></div>
                   <div class="assembly-part liquid-part" :class="{ empty: !selected.liquid, 'is-active': actionPart === 'liquid' }">
-                    <img v-if="selected.liquid" :src="productImage(selected.liquid, 'liquid')" data-part="liquid" :alt="selected.liquid.name" @error="useFallbackImage" />
-                    <span v-else class="part-placeholder">E-liquid</span>
+                    <div class="pod-tank">
+                      <span class="tank-mouthpiece"></span>
+                      <span class="tank-liquid"></span>
+                      <span v-if="selected.coil" class="tank-coil"></span>
+                    </div>
                     <small>E-liquid</small>
                   </div>
                   <div class="assembly-extras">
                     <div v-if="selected.coil" class="assembly-part mini-part" :class="{ 'is-active': actionPart === 'coil' }">
-                      <img :src="productImage(selected.coil, 'coil')" data-part="coil" :alt="selected.coil.name" @error="useFallbackImage" />
+                      <span class="coil-part"></span>
                       <small>Coil</small>
                     </div>
                     <div v-if="selected.accessory" class="assembly-part mini-part" :class="{ 'is-active': actionPart === 'accessory' }">
-                      <img :src="productImage(selected.accessory, 'accessory')" data-part="accessory" :alt="selected.accessory.name" @error="useFallbackImage" />
+                      <span class="charger-part"><span></span></span>
                       <small>Accessory</small>
                     </div>
                   </div>
@@ -149,6 +160,7 @@ const toastMessage = ref('');
 const loggedIn = ref(false);
 const actionPart = ref('');
 const liveAction = ref('Select a part to begin assembly');
+const assemblyVersion = ref(0);
 let actionTimer;
 
 const fallbackImages = {
@@ -221,6 +233,34 @@ const requiredGroupCount = computed(
 const requiredSelectedCount = computed(
   () => componentGroups.value.filter((group) => group.required && selected.value[group.key]).length
 );
+const colorPalettes = [
+  { primary: '#ff4d8d', light: '#ffb5d0', dark: '#4a1b31' },
+  { primary: '#7c5cff', light: '#c4b8ff', dark: '#271c5c' },
+  { primary: '#20d6c7', light: '#a5fff6', dark: '#123f43' },
+  { primary: '#ff9f43', light: '#ffd0a0', dark: '#5a3215' },
+  { primary: '#66a3ff', light: '#b8d5ff', dark: '#1b3764' },
+  { primary: '#b8e34b', light: '#e1ff9d', dark: '#354d16' },
+];
+const paletteFor = (product, fallbackIndex) => {
+  const value = `${product?.name || ''}${product?.category || ''}`;
+  const score = [...value].reduce((sum, character) => sum + character.charCodeAt(0), fallbackIndex);
+  return colorPalettes[score % colorPalettes.length];
+};
+const assemblyColors = computed(() => {
+  const device = paletteFor(selected.value.device, 0);
+  const liquid = paletteFor(selected.value.liquid, 1);
+  const coil = paletteFor(selected.value.coil, 2);
+  const accessory = paletteFor(selected.value.accessory, 3);
+  return {
+    '--device-primary': device.primary,
+    '--device-light': device.light,
+    '--device-dark': device.dark,
+    '--liquid-primary': liquid.primary,
+    '--liquid-light': liquid.light,
+    '--coil-color': coil.light,
+    '--accessory-color': accessory.light,
+  };
+});
 const previewStatus = computed(() => {
   if (!selected.value.device) return 'Choose a device to start';
   if (!selected.value.liquid) return 'Add e-liquid to continue';
@@ -232,6 +272,7 @@ const formatPrice = (price) => Number(price || 0).toFixed(2);
 
 const selectComponent = (group, product) => {
   selected.value = { ...selected.value, [group.key]: product };
+  assemblyVersion.value += 1;
   actionPart.value = group.key;
   liveAction.value = `Attaching ${group.label.toLowerCase()}...`;
   clearTimeout(actionTimer);
@@ -245,6 +286,7 @@ const clearComponent = (key) => {
   const next = { ...selected.value };
   delete next[key];
   selected.value = next;
+  assemblyVersion.value += 1;
   actionPart.value = '';
   liveAction.value = `${key} removed — choose another part`;
 };
@@ -436,7 +478,7 @@ onMounted(async () => {
 
 .live-preview {
   margin: -0.2rem -0.2rem 1.4rem;
-  padding: 0.9rem;
+  padding: 1.25rem;
   overflow: hidden;
   border-radius: 14px;
   background:
@@ -473,15 +515,15 @@ onMounted(async () => {
   position: relative;
   display: grid;
   place-items: center;
-  min-height: 210px;
+  min-height: 330px;
 }
 
 .vape-aura {
   position: absolute;
-  width: 130px;
-  height: 130px;
+  width: 220px;
+  height: 220px;
   border-radius: 50%;
-  background: rgba(255, 77, 141, 0.3);
+  background: color-mix(in srgb, var(--device-primary) 42%, transparent);
   filter: blur(26px);
   animation: preview-pulse 3s ease-in-out infinite;
 }
@@ -489,11 +531,8 @@ onMounted(async () => {
 .assembly-parts {
   position: relative;
   z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  width: 100%;
+  width: min(100%, 390px);
+  height: 275px;
 }
 
 .assembly-part {
@@ -504,8 +543,42 @@ onMounted(async () => {
   animation: part-in 0.35s ease both;
 }
 
+.device-part,
+.liquid-part {
+  position: absolute;
+  left: 50%;
+}
+
+.device-part {
+  bottom: 0.1rem;
+  z-index: 2;
+  transform: translateX(-50%);
+}
+
+.liquid-part {
+  top: 0.2rem;
+  z-index: 3;
+  transform: translateX(-50%);
+}
+
+.device-part:not(.empty) {
+  animation: assemble-device 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.liquid-part:not(.empty) {
+  animation: assemble-liquid 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 .assembly-part.is-active {
   animation: attach-part 0.65s ease both;
+}
+
+.device-part.is-active {
+  animation: assemble-device-active 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.liquid-part.is-active {
+  animation: assemble-liquid-active 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .assembly-part.is-active::before {
@@ -520,23 +593,6 @@ onMounted(async () => {
   text-shadow: 0 0 8px #ff4d8d;
 }
 
-.assembly-part img {
-  display: block;
-  width: 94px;
-  height: 118px;
-  padding: 0.25rem;
-  border: 1px solid rgba(255, 181, 208, 0.52);
-  border-radius: 12px;
-  background: linear-gradient(145deg, #fff, #f8d9e6);
-  object-fit: contain;
-  box-shadow: 0 12px 20px rgba(0, 0, 0, 0.35);
-}
-
-.device-part img {
-  width: 116px;
-  height: 148px;
-}
-
 .assembly-part small {
   color: #ffb5d0;
   font-size: 0.64rem;
@@ -545,59 +601,207 @@ onMounted(async () => {
   text-transform: uppercase;
 }
 
-.assembly-part.empty img {
-  display: none;
+.device-shell {
+  position: relative;
+  width: 112px;
+  height: 172px;
+  border: 2px solid var(--device-primary);
+  border-radius: 15px 15px 12px 12px;
+  background: linear-gradient(110deg, #101010, var(--device-dark) 52%, #090909);
+  box-shadow: inset 0 0 18px color-mix(in srgb, var(--device-primary) 40%, transparent), 0 12px 20px rgba(0, 0, 0, 0.35);
 }
 
-.part-placeholder {
-  display: grid;
-  place-items: center;
-  width: 94px;
-  height: 118px;
-  border: 1px dashed rgba(255, 181, 208, 0.4);
-  border-radius: 12px;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.7rem;
+.device-shell::before {
+  content: '';
+  position: absolute;
+  top: -14px;
+  left: 28px;
+  width: 52px;
+  height: 16px;
+  border: 2px solid var(--device-light);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  background: #171717;
 }
 
-.device-part .part-placeholder {
-  width: 116px;
-  height: 148px;
+.device-screen {
+  position: absolute;
+  top: 40px;
+  left: 27px;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid color-mix(in srgb, var(--device-light) 55%, transparent);
+  border-radius: 3px;
+  color: var(--device-light);
+  font: 800 0.78rem 'Syne', sans-serif;
+}
+
+.device-button {
+  position: absolute;
+  top: 82px;
+  left: 45px;
+  width: 18px;
+  height: 28px;
+  border: 1px solid var(--device-light);
+  border-radius: 5px;
+}
+
+.device-led {
+  position: absolute;
+  bottom: 25px;
+  left: 50px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--device-primary);
+  box-shadow: 0 0 12px var(--device-primary);
+}
+
+.device-part.empty .device-shell {
+  opacity: 0.35;
+  border-style: dashed;
+  box-shadow: none;
+}
+
+.pod-tank {
+  position: relative;
+  width: 96px;
+  height: 108px;
+  border: 2px solid var(--liquid-light);
+  border-radius: 12px 12px 18px 18px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), color-mix(in srgb, var(--liquid-primary) 22%, transparent), rgba(255, 255, 255, 0.08));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--liquid-primary) 55%, transparent), inset 0 -18px 0 color-mix(in srgb, var(--liquid-primary) 75%, #351322);
+}
+
+.tank-mouthpiece {
+  position: absolute;
+  top: -26px;
+  left: 30px;
+  width: 32px;
+  height: 26px;
+  border: 2px solid #d7d7d7;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  background: #282828;
+}
+
+.tank-liquid {
+  position: absolute;
+  right: 13px;
+  bottom: 13px;
+  left: 13px;
+  height: 36px;
+  border-radius: 4px 4px 10px 10px;
+  background: linear-gradient(var(--liquid-light), var(--liquid-primary));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--liquid-primary) 70%, transparent);
+}
+
+.tank-coil {
+  position: absolute;
+  bottom: 5px;
+  left: 40px;
+  width: 15px;
+  height: 15px;
+  border: 3px solid var(--coil-color);
+  border-radius: 50%;
+}
+
+.liquid-part.empty .pod-tank {
+  opacity: 0.35;
+  border-style: dashed;
+  box-shadow: none;
 }
 
 .assembly-connector {
-  width: 14px;
-  height: 2px;
-  background: #ff4d8d;
-  box-shadow: 0 0 10px #ff4d8d;
+  position: absolute;
+  top: 6.8rem;
+  left: 50%;
+  z-index: 4;
+  width: 78px;
+  height: 11px;
+  border-radius: 999px;
+  background: var(--device-primary);
+  box-shadow: 0 0 10px var(--device-primary);
+  transform: translateX(-50%);
+  animation: connector-pulse 1.8s ease-in-out infinite;
 }
 
 .assembly-extras {
   position: absolute;
-  right: 0.35rem;
-  bottom: -0.5rem;
+  right: -0.5rem;
+  bottom: 0.2rem;
+  z-index: 5;
   display: flex;
   gap: 0.4rem;
-}
-
-.mini-part img {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
 }
 
 .mini-part small {
   font-size: 0.54rem;
 }
 
+.coil-part {
+  display: block;
+  width: 48px;
+  height: 48px;
+  border: 7px solid var(--coil-color);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 4px var(--device-dark), 0 0 12px color-mix(in srgb, var(--coil-color) 70%, transparent);
+}
+
+.charger-part {
+  display: block;
+  position: relative;
+  width: 60px;
+  height: 36px;
+  border: 2px solid var(--accessory-color);
+  border-radius: 5px;
+  background: #252525;
+}
+
+.charger-part::after {
+  content: '';
+  position: absolute;
+  right: -18px;
+  top: 12px;
+  width: 18px;
+  height: 7px;
+  border-radius: 0 999px 999px 0;
+  background: var(--accessory-color);
+}
+
+.charger-part span {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  width: 18px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--accessory-color);
+}
+
 /* Keep the preview grounded while the product photography loads. */
 .vape-stage::after {
   content: '';
   position: absolute;
-  bottom: 1.55rem;
-  width: 75%;
+  bottom: 1.9rem;
+  width: 88%;
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(255, 181, 208, 0.7), transparent);
+}
+
+.build-complete .vape-aura {
+  width: 175px;
+  height: 175px;
+  background: color-mix(in srgb, var(--device-primary) 55%, transparent);
+  animation: complete-pulse 1.5s ease-in-out infinite;
+}
+
+.build-complete .assembly-parts {
+  animation: complete-build 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.build-complete .assembly-connector {
+  width: 72px;
+  box-shadow: 0 0 16px var(--device-primary), 0 0 30px color-mix(in srgb, var(--device-primary) 65%, transparent);
 }
 
 .vape-pod {
@@ -760,6 +964,44 @@ onMounted(async () => {
   100% { opacity: 1; transform: translateY(0) scale(1); filter: brightness(1); }
 }
 
+@keyframes assemble-device {
+  from { opacity: 0; transform: translate(-50%, 28px) scale(0.82) rotate(-5deg); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1) rotate(0); }
+}
+
+@keyframes assemble-liquid {
+  from { opacity: 0; transform: translate(-50%, -28px) scale(0.82) rotate(5deg); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1) rotate(0); }
+}
+
+@keyframes assemble-device-active {
+  0% { opacity: 0.45; transform: translate(-50%, 28px) scale(0.82) rotate(-5deg); filter: brightness(1.7); }
+  55% { opacity: 1; transform: translate(-50%, 3px) scale(1.04) rotate(1deg); filter: brightness(1.35); }
+  100% { opacity: 1; transform: translate(-50%, 0) scale(1) rotate(0); filter: brightness(1); }
+}
+
+@keyframes assemble-liquid-active {
+  0% { opacity: 0.45; transform: translate(-50%, -28px) scale(0.82) rotate(5deg); filter: brightness(1.7); }
+  55% { opacity: 1; transform: translate(-50%, 3px) scale(1.04) rotate(-1deg); filter: brightness(1.35); }
+  100% { opacity: 1; transform: translate(-50%, 0) scale(1) rotate(0); filter: brightness(1); }
+}
+
+@keyframes complete-build {
+  0% { transform: scale(0.92); filter: brightness(1); }
+  55% { transform: scale(1.05); filter: brightness(1.35); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+@keyframes connector-pulse {
+  0%, 100% { opacity: 0.5; transform: translateX(-50%) scaleX(0.7); }
+  50% { opacity: 1; transform: translateX(-50%) scaleX(1); }
+}
+
+@keyframes complete-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.92); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+
 @keyframes action-blink {
   from { opacity: 0.35; }
   to { opacity: 1; }
@@ -832,6 +1074,14 @@ onMounted(async () => {
 
   .build-summary {
     position: static;
+  }
+
+  .vape-stage {
+    min-height: 300px;
+  }
+
+  .assembly-parts {
+    transform: scale(0.9);
   }
 }
 </style>
