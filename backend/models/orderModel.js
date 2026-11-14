@@ -68,9 +68,10 @@ const create = async (
 
     const requestedQuantities = new Map();
     for (const item of items) {
-      const productId = Number.parseInt(item.product_id, 10);
-      const quantity = Number.parseInt(item.quantity, 10);
-      if (!productId || !Number.isInteger(quantity) || quantity < 1) {
+      const productId = Number(item.product_id);
+      const quantity = Number(item.quantity);
+      if (!Number.isSafeInteger(productId) || productId < 1 ||
+          !Number.isSafeInteger(quantity) || quantity < 1) {
         const err = new Error('Each item needs a valid product and quantity.');
         err.status = 400;
         throw err;
@@ -82,7 +83,7 @@ const create = async (
     let itemsTotal = 0;
     for (const [productId, quantity] of requestedQuantities) {
       const productResult = await client.query(
-        `SELECT id, price, stock FROM products WHERE id = $1 FOR UPDATE`, [productId]
+        `SELECT id, price, stock FROM products WHERE id = $1 AND active = TRUE FOR UPDATE`, [productId]
       );
       const product = productResult.rows[0];
       if (!product) {
@@ -155,17 +156,18 @@ const createPos = async (userId, items) => {
     const pricedItems = [];
 
     for (const item of items) {
-      const quantity = parseInt(item.quantity, 10);
-      const productId = parseInt(item.product_id, 10);
+      const quantity = Number(item.quantity);
+      const productId = Number(item.product_id);
 
-      if (!productId || !quantity || quantity < 1) {
+      if (!Number.isSafeInteger(productId) || productId < 1 ||
+          !Number.isSafeInteger(quantity) || quantity < 1) {
         const err = new Error('Each item needs a valid product_id and quantity.');
         err.status = 400;
         throw err;
       }
 
       const productResult = await client.query(
-        'SELECT id, name, price, stock FROM products WHERE id = $1 FOR UPDATE',
+        'SELECT id, name, price, stock FROM products WHERE id = $1 AND active = TRUE FOR UPDATE',
         [productId]
       );
       const product = productResult.rows[0];

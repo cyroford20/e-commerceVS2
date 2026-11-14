@@ -156,6 +156,15 @@ const updateRider = async (id, { name, phone, vehicleId, active, availability, z
       [name, id]
     );
     if (!user.rows[0]) return null;
+    if (!active || availability === 'unavailable') {
+      const inProgress = await client.query(`SELECT shipment_code FROM shipments
+        WHERE rider_user_id = $1 AND status IN (
+          'rider_assigned', 'accepted_by_rider', 'picked_up', 'out_for_delivery'
+        ) LIMIT 1`, [id]);
+      if (inProgress.rows[0]) {
+        throw problem(`Reassign shipment ${inProgress.rows[0].shipment_code} before deactivating or marking this rider unavailable.`, 409);
+      }
+    }
     await client.query(
       `UPDATE rider_profiles SET phone = $1, vehicle_id = $2, active = $3,
        availability = $4, updated_at = CURRENT_TIMESTAMP WHERE user_id = $5`,
@@ -334,11 +343,13 @@ const assignRider = async (shipmentId, riderId, assignedBy) =>
        updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
       [riderId, shipmentId]
     );
-    await client.query(`UPDATE orders SET delivery_person_id = $1, delivery_status = 'rider_assigned' WHERE id = $2`, [riderId, shipment.order_id]);
+    await client.query(`UPDATE orders SET delivery_person_id = $1,
+      delivery_person = (SELECT name FROM users WHERE id = $1), delivery_status = 'rider_assigned'
+      WHERE id = $2`, [riderId, shipment.order_id]);
     await addEvent(client, shipmentId, assignedBy, 'rider_assigned', 'Rider assigned to shipment');
     await notify(client, shipmentId, riderId, 'assignment', `Shipment ${shipment.shipment_code} was assigned to you.`);
     await notify(client, shipmentId, shipment.user_id, 'status', `A rider was assigned to shipment ${shipment.shipment_code}.`);
-    if (!shipment.otp_hash) {
+    if (!shipment.otp_hash || !shipment.otp_expires_at || new Date(shipment.otp_expires_at) <= new Date()) {
       const otp = makeOtp();
       await client.query(`UPDATE shipments SET otp_hash = $1,
         otp_expires_at = CURRENT_TIMESTAMP + INTERVAL '48 hours' WHERE id = $2`,
@@ -386,11 +397,13 @@ const autoAssignRider = async (shipmentId, assignedBy) =>
       VALUES ($1, $2, $3)`, [shipmentId, riderId, assignedBy]);
     await client.query(`UPDATE shipments SET rider_user_id = $1, status = 'rider_assigned', updated_at = CURRENT_TIMESTAMP
       WHERE id = $2`, [riderId, shipmentId]);
-    await client.query(`UPDATE orders SET delivery_person_id = $1, delivery_status = 'rider_assigned' WHERE id = $2`, [riderId, shipment.order_id]);
+    await client.query(`UPDATE orders SET delivery_person_id = $1,
+      delivery_person = (SELECT name FROM users WHERE id = $1), delivery_status = 'rider_assigned'
+      WHERE id = $2`, [riderId, shipment.order_id]);
     await addEvent(client, shipmentId, assignedBy, 'rider_assigned', 'Automatically assigned to the least-loaded available rider');
     await notify(client, shipmentId, riderId, 'assignment', `A new shipment was assigned to you.`);
     await notify(client, shipmentId, shipment.user_id, 'status', 'A rider was assigned to your delivery.');
-    if (!shipment.otp_hash) {
+    if (!shipment.otp_hash || !shipment.otp_expires_at || new Date(shipment.otp_expires_at) <= new Date()) {
       const otp = makeOtp();
       await client.query(`UPDATE shipments SET otp_hash = $1,
         otp_expires_at = CURRENT_TIMESTAMP + INTERVAL '48 hours' WHERE id = $2`,
@@ -402,6 +415,10 @@ const autoAssignRider = async (shipmentId, assignedBy) =>
   });
 
 const updateShipmentEta = async (shipmentId, assignedBy, estimatedAt) => inTransaction(async (client) => {
+  const eta = new Date(estimatedAt);
+  if (Number.isNaN(eta.getTime()) || eta <= new Date()) {
+    throw problem('Estimated delivery must be a valid future date and time.');
+  }
   const result = await client.query(`SELECT s.*, o.user_id FROM shipments s
     JOIN orders o ON o.id = s.order_id WHERE s.id = $1 FOR UPDATE OF s`, [shipmentId]);
   const shipment = result.rows[0];
@@ -490,13 +507,14 @@ const updateRiderShipment = async (shipmentId, riderId, input) => inTransaction(
     if (suppliedHash.length !== savedHash.length || !crypto.timingSafeEqual(suppliedHash, savedHash)) {
       throw problem('The customer OTP does not match.');
     }
-    if (typeof recipientName !== 'string' || recipientName.trim().length < 2) {
-      throw problem('Enter the recipient name before confirming delivery.');
+    if (typeof recipientName !== 'string' || recipientName.trim().length < 2 || recipientName.trim().length > 100) {
+      throw problem('Enter a recipient name between 2 and 100 characters before confirming delivery.');
     }
     if (proofConfirmed !== true && proofConfirmed !== 'true') {
       throw problem('Confirm that the order was handed to the recipient.');
     }
-    if (shipment.payment_method === 'cod' && (!Number.isFinite(Number(actualCod)) || Number(actualCod) < 0)) {
+    if (shipment.payment_method === 'cod' &&
+        (!Number.isFinite(Number(actualCod)) || Number(actualCod) < 0 || Number(actualCod) > 99999999.99)) {
       throw problem('Enter the cash amount collected for this COD order.');
     }
     await client.query(`INSERT INTO proof_of_delivery (shipment_id, recipient_name, photo_filename, confirmed_by)
@@ -521,7 +539,12 @@ const updateRiderShipment = async (shipmentId, riderId, input) => inTransaction(
       VALUES ($1, $2, 'failed', $3, $4)`, [shipmentId, riderId, failureReason, note || null]);
   }
 
-  if (status === 'rescheduled' && !rescheduledFor) throw problem('Choose a new delivery date and time.');
+  if (status === 'rescheduled') {
+    const newDeliveryDate = new Date(rescheduledFor);
+    if (!rescheduledFor || Number.isNaN(newDeliveryDate.getTime()) || newDeliveryDate <= new Date()) {
+      throw problem('Choose a valid delivery date and time in the future.');
+    }
+  }
   if (status === 'rescheduled') {
     await client.query(`UPDATE delivery_attempts SET rescheduled_for = $1
       WHERE id = (SELECT id FROM delivery_attempts WHERE shipment_id = $2 ORDER BY attempted_at DESC LIMIT 1)`,

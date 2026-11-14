@@ -30,6 +30,11 @@ app.get('/', (req, res) => {
 
 // Apply idempotent delivery additions before accepting requests.
 const startServer = async () => {
+  const productSchema = fs.readFileSync(
+    path.resolve(__dirname, '../database/product_management.sql'),
+    'utf8'
+  );
+  await pool.query(productSchema);
   const deliverySchema = fs.readFileSync(
     path.resolve(__dirname, '../database/delivery_management.sql'),
     'utf8'

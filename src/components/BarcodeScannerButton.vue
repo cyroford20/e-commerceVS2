@@ -1,6 +1,6 @@
 <template>
   <div class="scanner-control">
-    <button type="button" class="scanner-button" :disabled="scanning" @click="startScanner">
+    <button type="button" class="scanner-button" :disabled="scanning || disabled" @click="startScanner">
       {{ scanning ? 'Scanning...' : label }}
     </button>
 
@@ -18,7 +18,7 @@
           <div class="scanner-frame" aria-hidden="true"></div>
         </div>
         <h2>Scan barcode</h2>
-        <p>Point the camera at the product barcode.</p>
+        <p>Camera access is used only to scan a product barcode. Point the rear camera at the barcode.</p>
         <button type="button" class="scanner-cancel" @click="stopScanner">Cancel</button>
       </div>
     </div>
@@ -28,23 +28,29 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, ref } from 'vue';
+import { onBeforeUnmount, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import 'barcode-detector/polyfill';
 import { Capacitor } from '@capacitor/core';
-import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
+import { BarcodeFormat, BarcodeScanner, LensFacing } from '@capacitor-mlkit/barcode-scanning';
 
 defineProps({
   label: { type: String, default: 'Scan barcode' },
+  disabled: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['scanned']);
+const route = useRoute();
 const scanning = ref(false);
 const errorMessage = ref('');
 const videoElement = ref(null);
 const isWeb = Capacitor.getPlatform() === 'web';
 let scanListener;
+let scanHandled = false;
+let scannerSession = 0;
 
 const cleanup = async () => {
+  scannerSession += 1;
   document.body.classList.remove('barcode-scanner-active');
   if (scanListener) {
     await scanListener.remove();
@@ -60,10 +66,13 @@ const stopScanner = async () => {
 
 const startScanner = async () => {
   errorMessage.value = '';
+  scanHandled = false;
   scanning.value = true;
+  const session = ++scannerSession;
 
   try {
     const support = await BarcodeScanner.isSupported();
+    if (session !== scannerSession) return;
     if (!support.supported) {
       throw new Error('This device does not have a camera available for barcode scanning.');
     }
@@ -77,26 +86,49 @@ const startScanner = async () => {
         }
       }
     }
+    if (session !== scannerSession) return;
 
     document.body.classList.add('barcode-scanner-active');
     const eventName = isWeb ? 'barcodesScanned' : 'barcodeScanned';
     scanListener = await BarcodeScanner.addListener(eventName, async (result) => {
+      if (scanHandled) return;
       const barcode = result.barcode || result.barcodes?.[0];
       const value = barcode?.rawValue?.trim();
       if (!value) return;
+      scanHandled = true;
       await cleanup();
       emit('scanned', value);
     });
+    if (session !== scannerSession) {
+      await cleanup();
+      return;
+    }
 
-    await BarcodeScanner.startScan(isWeb ? { videoElement: videoElement.value } : undefined);
+    await BarcodeScanner.startScan({
+      formats: [
+        BarcodeFormat.Ean13,
+        BarcodeFormat.Ean8,
+        BarcodeFormat.UpcA,
+        BarcodeFormat.UpcE,
+        BarcodeFormat.Code128,
+      ],
+      lensFacing: LensFacing.Back,
+      ...(isWeb ? { videoElement: videoElement.value } : {}),
+    });
+    if (session !== scannerSession) await cleanup();
   } catch (error) {
+    const stillActive = session === scannerSession;
     await cleanup();
-    errorMessage.value = error.message || 'Could not start the barcode scanner.';
+    if (stillActive) errorMessage.value = error.message || 'Could not start the barcode scanner.';
   }
 };
 
 onBeforeUnmount(() => {
   cleanup();
+});
+
+watch(() => route.fullPath, () => {
+  if (scanning.value) stopScanner();
 });
 </script>
 

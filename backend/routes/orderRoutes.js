@@ -2,17 +2,6 @@ const express = require('express');
 const router = express.Router();
 const orderController = require('../controllers/orderController');
 const { authenticate, requireRole, requireActiveRider } = require('../middleware/authMiddleware');
-const { uploadProofPhoto } = require('../middleware/uploadMiddleware');
-
-const handleProofUpload = (req, res, next) => {
-  uploadProofPhoto.single('proof_photo')(req, res, (error) => {
-    if (!error) return next();
-    if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ message: 'Proof photo must be 5 MB or smaller.' });
-    }
-    return res.status(400).json({ message: error.message || 'Invalid proof photo.' });
-  });
-};
 
 // POST /api/orders  (customers only)
 router.post('/', authenticate, requireRole('customer'), orderController.createOrder);
@@ -24,7 +13,7 @@ router.post('/pos', authenticate, requireRole('store-owner'), orderController.cr
 router.get('/', authenticate, requireRole('store-owner'), orderController.getAllOrders);
 
 // PUT /api/orders/:id/delivery (store owner manages delivery)
-router.put('/:id/delivery', authenticate, requireRole('store-owner'), orderController.updateDelivery);
+router.put('/:id/delivery', authenticate, requireRole('store-owner'), orderController.legacyDeliveryMutation);
 
 router.get(
   '/assigned',
@@ -39,7 +28,7 @@ router.put(
   authenticate,
   requireRole('delivery-person'),
   requireActiveRider,
-  orderController.acceptAssignedDelivery
+  orderController.legacyDeliveryMutation
 );
 
 router.put(
@@ -47,8 +36,7 @@ router.put(
   authenticate,
   requireRole('delivery-person'),
   requireActiveRider,
-  handleProofUpload,
-  orderController.updateAssignedDelivery
+  orderController.legacyDeliveryMutation
 );
 
 router.put(
@@ -56,7 +44,7 @@ router.put(
   authenticate,
   requireRole('delivery-person'),
   requireActiveRider,
-  orderController.updateDeliveryLocation
+  orderController.legacyDeliveryMutation
 );
 
 router.get('/proof/:eventId', authenticate, orderController.getProofPhoto);

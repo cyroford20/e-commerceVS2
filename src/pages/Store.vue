@@ -73,7 +73,7 @@
 
           <header class="topbar" :class="{ compact: tab === 'pos' }">
             <div>
-              <p class="eyebrow">{{ greeting }} Â· {{ todayLabel }}</p>
+              <p class="eyebrow">{{ greeting }} ? {{ todayLabel }}</p>
               <h1>{{ pageTitle }}</h1>
               <p class="subhead">{{ pageSubhead }}</p>
             </div>
@@ -125,7 +125,7 @@
               <div>
                 <p class="banner-kicker">Live store pulse</p>
                 <h2>Your catalog is ready to sell.</h2>
-                <p>{{ products.length }} products online Â· {{ orders.length }} orders tracked</p>
+                <p>{{ products.length }} products online ? {{ orders.length }} orders tracked</p>
               </div>
               <div class="banner-orb" aria-hidden="true"></div>
             </div>
@@ -180,7 +180,7 @@
                     <img :src="product.image_url" :alt="product.name" />
                     <div>
                       <strong>{{ product.name }}</strong>
-                      <span>{{ product.stock }} left Â· {{ product.category || 'General' }}</span>
+                      <span>{{ product.stock }} left ? {{ product.category || 'General' }}</span>
                     </div>
                     <em>{{ Math.max(0, 20 - Number(product.stock)) }} to restock</em>
                   </li>
@@ -217,7 +217,7 @@
                       </td>
                       <td>{{ order.items?.length || 0 }}</td>
                       <td>{{ formatDate(order.created_at) }}</td>
-                      <td class="price-text">â‚±{{ formatPrice(order.total) }}</td>
+                      <td class="price-text">PHP {{ formatPrice(order.total) }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -233,7 +233,13 @@
                     <h3>Floor catalog</h3>
                     <p class="muted">{{ filteredPosProducts.length }} sellable items</p>
                   </div>
+                  <BarcodeScannerButton
+                    label="Scan for POS"
+                    :disabled="posScanLoading || posWorking"
+                    @scanned="findScannedPosProduct"
+                  />
                 </div>
+                <p v-if="posScanLoading" class="muted" role="status">Looking up scanned product...</p>
                 <div v-if="filteredPosProducts.length === 0" class="panel-empty">
                   No in-stock products match this search.
                 </div>
@@ -251,7 +257,7 @@
                       <strong>{{ product.name }}</strong>
                       <span class="muted">{{ product.category || 'Uncategorized' }}</span>
                       <div class="pos-sku-meta">
-                        <em>â‚±{{ formatPrice(product.price) }}</em>
+                        <em>PHP {{ formatPrice(product.price) }}</em>
                         <span :class="['stock-pill', product.stock < 20 ? 'low' : 'ok']">
                           {{ product.stock }} left
                         </span>
@@ -265,7 +271,7 @@
                 <div class="panel-head">
                   <div>
                     <h3>Sale ticket</h3>
-                    <p class="muted">{{ posItemCount }} items Â· walk-up checkout</p>
+                    <p class="muted">{{ posItemCount }} items ? walk-up checkout</p>
                   </div>
                 </div>
 
@@ -274,7 +280,7 @@
                   <select v-model="posCustomerId">
                     <option value="walkin">Walk-in customer</option>
                     <option v-for="customer in customers" :key="customer.id" :value="String(customer.id)">
-                      {{ customer.name }} Â· {{ customer.email }}
+                      {{ customer.name }} ? {{ customer.email }}
                     </option>
                   </select>
                 </label>
@@ -288,15 +294,15 @@
                     <img :src="line.image_url" :alt="line.name" />
                     <div class="pos-line-info">
                       <strong>{{ line.name }}</strong>
-                      <span>â‚±{{ formatPrice(line.price) }} each</span>
+                      <span>PHP {{ formatPrice(line.price) }} each</span>
                       <div class="pos-qty">
-                        <button type="button" @click="changePosQty(line.id, -1)">âˆ’</button>
+                        <button type="button" @click="changePosQty(line.id, -1)">?</button>
                         <em>{{ line.quantity }}</em>
                         <button type="button" @click="changePosQty(line.id, 1)">+</button>
                       </div>
                     </div>
                     <div class="pos-line-side">
-                      <strong>â‚±{{ formatPrice(line.price * line.quantity) }}</strong>
+                      <strong>PHP {{ formatPrice(line.price * line.quantity) }}</strong>
                       <button type="button" class="danger-link" @click="removeFromPos(line.id)">
                         Remove
                       </button>
@@ -307,7 +313,7 @@
                 <div class="pos-footer">
                   <div class="pos-total">
                     <span>Total due</span>
-                    <strong>â‚±{{ formatPrice(posTotal) }}</strong>
+                    <strong>PHP {{ formatPrice(posTotal) }}</strong>
                   </div>
                   <p class="form-error" v-if="posError">{{ posError }}</p>
                   <p class="form-ok" v-if="posOk">{{ posOk }}</p>
@@ -363,7 +369,7 @@
                 <label>
                   Barcode
                   <div class="barcode-field">
-                    <input v-model="form.barcode" type="text" inputmode="numeric" placeholder="Scan or enter EAN/UPC" />
+                    <input v-model="form.barcode" type="text" maxlength="64" placeholder="Scan or enter EAN/UPC" />
                     <BarcodeScannerButton label="Scan" @scanned="form.barcode = $event" />
                   </div>
                 </label>
@@ -400,6 +406,7 @@
                       <th>Category</th>
                       <th>Stock</th>
                       <th>Price</th>
+                      <th>Status</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -425,10 +432,14 @@
                           </div>
                         </div>
                       </td>
-                      <td class="price-text">â‚±{{ formatPrice(product.price) }}</td>
+                      <td class="price-text">PHP {{ formatPrice(product.price) }}</td>
+                      <td><span :class="['tag', { inactive: !product.active }]">{{ product.active ? 'Active' : 'Inactive' }}</span></td>
                       <td>
                         <div class="row-actions">
                           <button type="button" @click="startEdit(product)">Edit</button>
+                          <button type="button" :disabled="productStatusSavingId === product.id" @click="toggleProductActive(product)">
+                            {{ productStatusSavingId === product.id ? 'Saving...' : product.active ? 'Deactivate' : 'Reactivate' }}
+                          </button>
                           <button type="button" class="danger" @click="removeProduct(product)">Delete</button>
                         </div>
                       </td>
@@ -458,7 +469,7 @@
                     </div>
                     <div class="order-right">
                       <span class="status">{{ order.channel === 'pos' ? 'POS' : 'Online' }}</span>
-                      <strong class="price-text">â‚±{{ formatPrice(order.total) }}</strong>
+                      <strong class="price-text">PHP {{ formatPrice(order.total) }}</strong>
                       <span class="muted">{{ formatDate(order.created_at) }}</span>
                     </div>
                   </div>
@@ -467,7 +478,7 @@
                       <img :src="item.image_url" :alt="item.product_name" />
                       <div>
                         <strong>{{ item.product_name }}</strong>
-                        <span>Qty {{ item.quantity }} Â· â‚±{{ formatPrice(item.price) }}</span>
+                        <span>Qty {{ item.quantity }} ? PHP {{ formatPrice(item.price) }}</span>
                       </div>
                     </div>
                   </div>
@@ -477,7 +488,7 @@
           </section>
 
           <section v-if="tab === 'delivery'" class="view">
-            <DeliveryAdminPanel />
+            <DeliveryAdminPanel :active="storePageActive" />
           </section>
 
           <section v-if="tab === 'customers'" class="view">
@@ -512,7 +523,7 @@
                       </td>
                       <td>{{ customer.email }}</td>
                       <td>{{ customer.order_count }}</td>
-                      <td class="price-text">â‚±{{ formatPrice(customer.total_spent) }}</td>
+                      <td class="price-text">PHP {{ formatPrice(customer.total_spent) }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -561,7 +572,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed } from 'vue';
+import { onIonViewWillEnter, onIonViewWillLeave } from '@ionic/vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent, IonIcon } from '@ionic/vue';
 import {
@@ -583,15 +595,13 @@ import {
   getMe,
   updateMe,
   getCustomers,
-  getProducts,
+  getOwnerProducts,
+  getProductByBarcode,
   getAllOrders,
   createProduct,
   updateProduct,
   deleteProduct,
   createPosOrder,
-  updateDelivery,
-  getDeliveryPersons,
-  createDeliveryPerson,
   saveAuth,
   getToken,
   logout,
@@ -607,6 +617,8 @@ const posQuery = ref('');
 const posCart = ref([]);
 const posCustomerId = ref('walkin');
 const posWorking = ref(false);
+const posScanLoading = ref(false);
+const productStatusSavingId = ref(null);
 const posError = ref('');
 const posOk = ref('');
 const ownerName = ref('');
@@ -622,25 +634,20 @@ const emptyForm = () => ({
   stock: '',
   barcode: '',
   image_url: '',
+  active: true,
 });
 
 const profile = ref(null);
 const products = ref([]);
 const orders = ref([]);
 const customers = ref([]);
-const deliveryPersons = ref([]);
-const deliveryAssignments = ref({});
-const deliveryStatuses = ref({});
-const newCourier = ref({ name: '', email: '', password: '' });
-const creatingCourier = ref(false);
-const courierMessage = ref('');
+const storePageActive = ref(false);
 const loading = ref(true);
 const saving = ref(false);
 const editing = ref(false);
 const form = ref(emptyForm());
 const formError = ref('');
 const error = ref('');
-let deliveryRefreshTimer;
 
 const pageTitle = computed(() => {
   if (tab.value === 'products') return 'Products';
@@ -692,15 +699,15 @@ const totalRevenue = computed(() =>
 );
 
 const totalStock = computed(() =>
-  products.value.reduce((sum, product) => sum + Number(product.stock || 0), 0)
+  products.value.filter((product) => product.active).reduce((sum, product) => sum + Number(product.stock || 0), 0)
 );
 
 const lowStockProducts = computed(() =>
-  products.value.filter((product) => Number(product.stock) < 20).slice(0, 6)
+  products.value.filter((product) => product.active && Number(product.stock) < 20).slice(0, 6)
 );
 
 const lowStockCount = computed(() =>
-  products.value.filter((product) => Number(product.stock) < 20).length
+  products.value.filter((product) => product.active && Number(product.stock) < 20).length
 );
 
 const recentOrders = computed(() => orders.value.slice(0, 5));
@@ -750,7 +757,7 @@ const filteredCustomers = computed(() => {
 const filteredPosProducts = computed(() => {
   const q = posQuery.value.trim().toLowerCase();
   return products.value.filter((product) => {
-    if (Number(product.stock) <= 0) return false;
+    if (!product.active || Number(product.stock) <= 0) return false;
     if (!q) return true;
     return (
       product.name.toLowerCase().includes(q) ||
@@ -778,7 +785,7 @@ const customerInitials = (name = '') =>
 
 const categoryBars = computed(() => {
   const map = {};
-  products.value.forEach((product) => {
+  products.value.filter((product) => product.active).forEach((product) => {
     const key = product.category || 'Other';
     map[key] = (map[key] || 0) + Number(product.stock || 0);
   });
@@ -792,9 +799,9 @@ const categoryBars = computed(() => {
 const stats = computed(() => [
   {
     label: 'Products',
-    value: products.value.length,
+    value: products.value.filter((product) => product.active).length,
     hint: 'Live catalog SKUs',
-    meter: `${Math.min(100, products.value.length * 10)}%`,
+    meter: `${Math.min(100, products.value.filter((product) => product.active).length * 10)}%`,
     tone: '',
     icon: layersOutline,
   },
@@ -816,7 +823,7 @@ const stats = computed(() => [
   },
   {
     label: 'Revenue',
-    value: `â‚±${formatPrice(totalRevenue.value)}`,
+    value: `PHP ${formatPrice(totalRevenue.value)}`,
     hint: `${totalStock.value} units in stock`,
     meter: `${Math.min(100, Number(totalRevenue.value) / 50)}%`,
     tone: 'accent',
@@ -856,12 +863,11 @@ const loadStore = async () => {
   loading.value = true;
   error.value = '';
   try {
-    const [me, catalog, orderList, customerList, courierList] = await Promise.all([
+    const [me, catalog, orderList, customerList] = await Promise.all([
       getMe(),
-      getProducts(),
+      getOwnerProducts(),
       getAllOrders(),
       getCustomers(),
-      getDeliveryPersons(),
     ]);
     profile.value = me.data;
     ownerName.value = me.data.name || '';
@@ -870,54 +876,10 @@ const loadStore = async () => {
     products.value = catalog.data;
     orders.value = orderList.data;
     customers.value = customerList.data;
-    deliveryPersons.value = courierList.data;
-    deliveryAssignments.value = Object.fromEntries(
-      orders.value.map((order) => [order.id, String(order.delivery_person_id || '')])
-    );
-    deliveryStatuses.value = Object.fromEntries(
-      orders.value.map((order) => [order.id, order.delivery_status || 'pending'])
-    );
   } catch (err) {
     error.value = err.response?.data?.message || 'Could not load the store.';
   } finally {
     loading.value = false;
-  }
-};
-
-const createCourier = async () => {
-  creatingCourier.value = true;
-  courierMessage.value = '';
-  try {
-    const response = await createDeliveryPerson(
-      newCourier.value.name.trim(),
-      newCourier.value.email.trim(),
-      newCourier.value.password
-    );
-    deliveryPersons.value = [...deliveryPersons.value, response.data.user].sort((a, b) =>
-      a.name.localeCompare(b.name)
-    );
-    newCourier.value = { name: '', email: '', password: '' };
-    courierMessage.value = 'Courier account created.';
-  } catch (err) {
-    courierMessage.value =
-      err.response?.data?.message || 'Could not create courier account.';
-  } finally {
-    creatingCourier.value = false;
-  }
-};
-
-const saveDelivery = async (order) => {
-  error.value = '';
-  try {
-    const res = await updateDelivery(
-      order.id,
-      deliveryStatuses.value[order.id],
-      deliveryAssignments.value[order.id]
-    );
-    const index = orders.value.findIndex((item) => item.id === order.id);
-    if (index >= 0) orders.value[index] = { ...orders.value[index], ...res.data };
-  } catch (err) {
-    error.value = err.response?.data?.message || 'Could not update delivery.';
   }
 };
 
@@ -937,6 +899,7 @@ const startEdit = (product) => {
     stock: String(product.stock),
     barcode: product.barcode || '',
     image_url: product.image_url || '',
+    active: product.active !== false,
   };
   formError.value = '';
   editing.value = true;
@@ -952,6 +915,7 @@ const saveProduct = async () => {
     stock: Number(form.value.stock),
     barcode: form.value.barcode.trim(),
     image_url: form.value.image_url,
+    active: form.value.active,
   };
 
   try {
@@ -961,7 +925,7 @@ const saveProduct = async () => {
       await createProduct(payload);
     }
     editing.value = false;
-    const catalog = await getProducts();
+    const catalog = await getOwnerProducts();
     products.value = catalog.data;
   } catch (err) {
     formError.value = err.response?.data?.message || 'Could not save the product.';
@@ -978,6 +942,28 @@ const removeProduct = async (product) => {
     products.value = products.value.filter((item) => item.id !== product.id);
   } catch (err) {
     error.value = err.response?.data?.message || 'Could not delete the product.';
+  }
+};
+
+const toggleProductActive = async (product) => {
+  productStatusSavingId.value = product.id;
+  error.value = '';
+  try {
+    const response = await updateProduct(product.id, {
+      name: product.name,
+      category: product.category || '',
+      price: Number(product.price),
+      stock: Number(product.stock),
+      barcode: product.barcode || '',
+      image_url: product.image_url || '',
+      active: !product.active,
+    });
+    const index = products.value.findIndex((item) => item.id === product.id);
+    if (index >= 0) products.value[index] = response.data;
+  } catch (err) {
+    error.value = err.response?.data?.message || 'Could not update product availability.';
+  } finally {
+    productStatusSavingId.value = null;
   }
 };
 
@@ -1005,6 +991,24 @@ const addToPos = (product) => {
     stock,
     quantity: 1,
   });
+};
+
+const findScannedPosProduct = async (barcode) => {
+  posError.value = '';
+  posOk.value = '';
+  posScanLoading.value = true;
+  try {
+    const response = await getProductByBarcode(barcode);
+    const product = response.data;
+    const index = products.value.findIndex((item) => item.id === product.id);
+    if (index >= 0) products.value[index] = { ...products.value[index], ...product };
+    else products.value.unshift(product);
+    addToPos(product);
+  } catch (err) {
+    posError.value = err.response?.data?.message || 'No catalog product matches that barcode.';
+  } finally {
+    posScanLoading.value = false;
+  }
 };
 
 const changePosQty = (productId, delta) => {
@@ -1063,7 +1067,7 @@ const completePosSale = async () => {
     posCustomerId.value = 'walkin';
 
     const [catalog, orderList, customerList] = await Promise.all([
-      getProducts(),
+      getOwnerProducts(),
       getAllOrders(),
       getCustomers(),
     ]);
@@ -1105,27 +1109,13 @@ const saveOwnerProfile = async () => {
   }
 };
 
-const refreshDeliveryQueue = async () => {
-  if (tab.value !== 'delivery') return;
-  try {
-    const response = await getAllOrders();
-    orders.value = response.data;
-    deliveryAssignments.value = Object.fromEntries(
-      orders.value.map((order) => [order.id, String(order.delivery_person_id || '')])
-    );
-    deliveryStatuses.value = Object.fromEntries(
-      orders.value.map((order) => [order.id, order.delivery_status || 'pending'])
-    );
-  } catch (err) {
-    error.value = err.response?.data?.message || 'Could not refresh deliveries.';
-  }
-};
-
-onMounted(async () => {
+onIonViewWillEnter(async () => {
+  storePageActive.value = true;
   await loadStore();
-  deliveryRefreshTimer = window.setInterval(refreshDeliveryQueue, 15000);
 });
-onBeforeUnmount(() => window.clearInterval(deliveryRefreshTimer));
+onIonViewWillLeave(() => {
+  storePageActive.value = false;
+});
 </script>
 
 <style scoped>
@@ -1911,6 +1901,11 @@ onBeforeUnmount(() => window.clearInterval(deliveryRefreshTimer));
 .tag {
   background: #fff0f5;
   color: #d4146a;
+}
+
+.tag.inactive {
+  background: #ece8eb;
+  color: #6c6268;
 }
 
 .stock-cell {

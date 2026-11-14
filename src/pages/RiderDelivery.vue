@@ -101,8 +101,8 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
-import { IonPage, IonContent } from '@ionic/vue';
+import { computed, onBeforeUnmount, reactive, ref } from 'vue';
+import { IonPage, IonContent, onIonViewWillEnter, onIonViewWillLeave } from '@ionic/vue';
 import Navbar from '../components/Navbar.vue';
 import {
   acceptShipment, getDeliveryNotifications, getRiderShipments, getShipmentProof,
@@ -236,8 +236,18 @@ const readNotification = async (notification) => {
   catch { error.value = 'Could not mark update as read.'; }
 };
 
-onMounted(async () => { await refreshShipments(); refreshTimer = window.setInterval(refreshShipments, 15000); });
-onBeforeUnmount(() => { window.clearInterval(refreshTimer); shipments.value.forEach(stopLocation); });
+const enterRiderPage = async () => {
+  await refreshShipments();
+  window.clearInterval(refreshTimer);
+  refreshTimer = window.setInterval(refreshShipments, 15000);
+};
+const leaveRiderPage = () => {
+  window.clearInterval(refreshTimer);
+  shipments.value.forEach(stopLocation);
+};
+onIonViewWillEnter(enterRiderPage);
+onIonViewWillLeave(leaveRiderPage);
+onBeforeUnmount(leaveRiderPage);
 </script>
 
 <style scoped>

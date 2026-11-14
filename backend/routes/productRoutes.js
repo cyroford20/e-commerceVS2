@@ -7,8 +7,10 @@ const ownerOnly = [authenticate, requireRole('store-owner')];
 
 // GET /api/products
 router.get('/', productController.getAllProducts);
+router.get('/admin/catalog', ...ownerOnly, productController.getOwnerProducts);
 
 // Keep this route before /:id so "barcode" is not treated as an id.
+router.get('/barcode', productController.getProductByBarcode);
 router.get('/barcode/:barcode', productController.getProductByBarcode);
 
 // GET /api/products/:id

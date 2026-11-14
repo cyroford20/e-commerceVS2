@@ -3,6 +3,11 @@ const userModel = require('../models/userModel');
 const path = require('path');
 const fs = require('fs');
 const { proofDirectory } = require('../middleware/uploadMiddleware');
+const parseId = (value) => {
+  if (!/^[1-9]\d*$/.test(String(value || ''))) return null;
+  const id = Number(value);
+  return Number.isSafeInteger(id) ? id : null;
+};
 
 // POST /api/orders
 const createOrder = async (req, res) => {
@@ -17,15 +22,15 @@ const createOrder = async (req, res) => {
     } = req.body;
     const userId = req.user.id;
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
+    if (!Array.isArray(items) || items.length === 0 || items.length > 100) {
       return res.status(400).json({ message: 'Order must have at least one item.' });
     }
 
     if (
       typeof deliveryAddress !== 'string' ||
-      deliveryAddress.trim().length < 10 ||
+      deliveryAddress.trim().length < 10 || deliveryAddress.trim().length > 2000 ||
       typeof deliveryPhone !== 'string' ||
-      deliveryPhone.trim().length < 7
+      deliveryPhone.trim().length < 7 || deliveryPhone.trim().length > 30
     ) {
       return res.status(400).json({
         message: 'A complete delivery address and phone number are required.',
@@ -33,14 +38,15 @@ const createOrder = async (req, res) => {
     }
 
     for (const item of items) {
-      if (!item.product_id || !item.quantity || !item.price) {
+      if (!item || !Number.isSafeInteger(Number(item.product_id)) || Number(item.product_id) < 1 ||
+          !Number.isSafeInteger(Number(item.quantity)) || Number(item.quantity) < 1) {
         return res.status(400).json({
-          message: 'Each item needs product_id, quantity, and price.',
+          message: 'Each item needs a valid product and positive whole-number quantity.',
         });
       }
     }
 
-    if (!Number.isInteger(Number(deliveryZoneId)) || Number(deliveryZoneId) < 1) {
+    if (!Number.isSafeInteger(Number(deliveryZoneId)) || Number(deliveryZoneId) < 1) {
       return res.status(400).json({ message: 'Choose a delivery zone.' });
     }
     if (paymentMethod !== 'cod') {
@@ -74,13 +80,17 @@ const createPosOrder = async (req, res) => {
   try {
     const { items, customer_id: customerId } = req.body;
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
+    if (!Array.isArray(items) || items.length === 0 || items.length > 100) {
       return res.status(400).json({ message: 'Sale must have at least one item.' });
     }
 
     let userId;
     if (customerId) {
-      const customer = await userModel.findById(customerId);
+      const id = Number(customerId);
+      if (!Number.isSafeInteger(id) || id < 1) {
+        return res.status(400).json({ message: 'Selected customer was not found.' });
+      }
+      const customer = await userModel.findById(id);
       if (!customer || customer.role !== 'customer') {
         return res.status(400).json({ message: 'Selected customer was not found.' });
       }
@@ -110,8 +120,9 @@ const createPosOrder = async (req, res) => {
 // GET /api/orders/user/:id
 const getUserOrders = async (req, res) => {
   try {
-    const requestedId = parseInt(req.params.id, 10);
+    const requestedId = parseId(req.params.id);
 
+    if (!requestedId) return res.status(400).json({ message: 'Invalid customer ID.' });
     if (req.user.id !== requestedId) {
       return res.status(403).json({ message: 'You can only view your own orders.' });
     }
@@ -138,7 +149,7 @@ const getAllOrders = async (req, res) => {
 // PUT /api/orders/:id/delivery (store owner)
 const updateDelivery = async (req, res) => {
   try {
-    const orderId = Number.parseInt(req.params.id, 10);
+    const orderId = parseId(req.params.id);
     const { status, delivery_person_id: deliveryPersonId } = req.body;
     const allowedStatuses = [
       'pending',
@@ -148,7 +159,7 @@ const updateDelivery = async (req, res) => {
       'cancelled',
     ];
 
-    if (!Number.isInteger(orderId) || !allowedStatuses.includes(status)) {
+    if (!orderId || !allowedStatuses.includes(status)) {
       return res.status(400).json({ message: 'Invalid delivery update.' });
     }
 
@@ -181,8 +192,8 @@ const getAssignedDeliveries = async (req, res) => {
 
 const acceptAssignedDelivery = async (req, res) => {
   try {
-    const orderId = Number.parseInt(req.params.id, 10);
-    if (!Number.isInteger(orderId)) {
+    const orderId = parseId(req.params.id);
+    if (!orderId) {
       return res.status(400).json({ message: 'Invalid order.' });
     }
     const order = await orderModel.acceptAssignedDelivery(orderId, req.user.id);
@@ -200,12 +211,12 @@ const acceptAssignedDelivery = async (req, res) => {
 
 const updateDeliveryLocation = async (req, res) => {
   try {
-    const orderId = Number.parseInt(req.params.id, 10);
+    const orderId = parseId(req.params.id);
     const latitude = Number(req.body.latitude);
     const longitude = Number(req.body.longitude);
     const accuracy = req.body.accuracy == null ? null : Number(req.body.accuracy);
     if (
-      !Number.isInteger(orderId) ||
+      !orderId ||
       !Number.isFinite(latitude) ||
       !Number.isFinite(longitude) ||
       latitude < -90 ||
@@ -237,7 +248,7 @@ const updateDeliveryLocation = async (req, res) => {
 
 const getDeliveryLocation = async (req, res) => {
   try {
-    const orderId = Number.parseInt(req.params.id, 10);
+    const orderId = parseId(req.params.id);
     const location = await orderModel.getDeliveryLocation(orderId);
     if (!location) return res.status(404).json({ message: 'Delivery location not found.' });
     const allowed =
@@ -256,7 +267,7 @@ const updateAssignedDelivery = async (req, res) => {
   let uploadedPath = null;
   try {
     uploadedPath = req.file?.path || null;
-    const orderId = Number.parseInt(req.params.id, 10);
+    const orderId = parseId(req.params.id);
     const {
       status,
       recipient_name: recipientName,
@@ -264,7 +275,7 @@ const updateAssignedDelivery = async (req, res) => {
     } = req.body;
     const proofConfirmedValue = proofConfirmed === true || proofConfirmed === 'true';
     const allowedStatuses = ['assigned', 'out_for_delivery', 'delivered', 'cancelled'];
-    if (!Number.isInteger(orderId) || !allowedStatuses.includes(status)) {
+    if (!orderId || !allowedStatuses.includes(status)) {
       if (uploadedPath) fs.unlink(uploadedPath, () => {});
       return res.status(400).json({ message: 'Invalid delivery status.' });
     }
@@ -305,7 +316,8 @@ const updateAssignedDelivery = async (req, res) => {
 
 const getProofPhoto = async (req, res) => {
   try {
-    const eventId = Number.parseInt(req.params.eventId, 10);
+    const eventId = parseId(req.params.eventId);
+    if (!eventId) return res.status(400).json({ message: 'Invalid proof ID.' });
     const proof = await orderModel.getProofPhoto(eventId);
     if (!proof) {
       return res.status(404).json({ message: 'Proof photo not found.' });
@@ -326,6 +338,10 @@ const getProofPhoto = async (req, res) => {
   }
 };
 
+const legacyDeliveryMutation = (req, res) => res.status(410).json({
+  message: 'This delivery workflow has been replaced. Use the shipment delivery module for verified status updates.',
+});
+
 module.exports = {
   createOrder,
   createPosOrder,
@@ -338,4 +354,5 @@ module.exports = {
   getDeliveryLocation,
   updateAssignedDelivery,
   getProofPhoto,
+  legacyDeliveryMutation,
 };

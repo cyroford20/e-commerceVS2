@@ -41,12 +41,14 @@ export const getProducts = () => {
   return api.get('/products');
 };
 
+export const getOwnerProducts = () => api.get('/products/admin/catalog');
+
 export const getProductById = (id) => {
   return api.get(`/products/${id}`);
 };
 
 export const getProductByBarcode = (barcode) => {
-  return api.get(`/products/barcode/${encodeURIComponent(barcode)}`);
+  return api.get('/products/barcode', { params: { code: barcode } });
 };
 
 // ---------- ORDERS ----------

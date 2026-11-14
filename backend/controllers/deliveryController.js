@@ -1,12 +1,13 @@
 const bcrypt = require('bcrypt');
 const fs = require('fs');
 const path = require('path');
-const { proofDirectory } = require('../middleware/uploadMiddleware');
+const { proofDirectory, validateProofPhotoFile } = require('../middleware/uploadMiddleware');
 const deliveryModel = require('../models/deliveryModel');
 
 const parseId = (value) => {
-  const id = Number.parseInt(value, 10);
-  return Number.isInteger(id) && id > 0 ? id : null;
+  if (!/^[1-9]\d*$/.test(String(value || ''))) return null;
+  const id = Number(value);
+  return Number.isSafeInteger(id) ? id : null;
 };
 
 const sendError = (res, error, fallback) => {
@@ -14,6 +15,7 @@ const sendError = (res, error, fallback) => {
   console.error(fallback, error);
   res.status(error.status || 500).json({ message: error.status ? error.message : fallback });
 };
+const validMoney = (amount) => Number.isFinite(amount) && amount >= 0 && amount <= 99999999.99;
 
 const listZones = async (req, res) => {
   try {
@@ -25,11 +27,12 @@ const listZones = async (req, res) => {
 
 const createZone = async (req, res) => {
   try {
-    const name = String(req.body.name || '').trim();
-    const city = String(req.body.city || '').trim();
-    const barangay = String(req.body.barangay || '').trim();
+    const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+    const city = typeof req.body.city === 'string' ? req.body.city.trim() : '';
+    const barangay = typeof req.body.barangay === 'string' ? req.body.barangay.trim() : '';
     const fee = Number(req.body.delivery_fee);
-    if (!name || !city || !barangay || !Number.isFinite(fee) || fee < 0) {
+    if (!name || name.length > 100 || !city || city.length > 100 ||
+        !barangay || barangay.length > 100 || !validMoney(fee)) {
       return res.status(400).json({ message: 'Name, city, barangay, and a non-negative delivery fee are required.' });
     }
     res.status(201).json(await deliveryModel.createZone({ name, city, barangay, deliveryFee: fee }));
@@ -41,12 +44,17 @@ const createZone = async (req, res) => {
 const updateZone = async (req, res) => {
   try {
     const id = parseId(req.params.id);
+    const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+    const city = typeof req.body.city === 'string' ? req.body.city.trim() : '';
+    const barangay = typeof req.body.barangay === 'string' ? req.body.barangay.trim() : '';
     const fee = Number(req.body.delivery_fee);
-    if (!id || !req.body.name?.trim() || !req.body.city?.trim() || !req.body.barangay?.trim() || !Number.isFinite(fee) || fee < 0 || typeof req.body.active !== 'boolean') {
+    if (!id || !name || name.length > 100 || !city || city.length > 100 ||
+        !barangay || barangay.length > 100 ||
+        !validMoney(fee) || typeof req.body.active !== 'boolean') {
       return res.status(400).json({ message: 'Provide a valid zone name, city, barangay, fee, and active flag.' });
     }
     const zone = await deliveryModel.updateZone(id, {
-      name: req.body.name.trim(), city: req.body.city.trim(), barangay: req.body.barangay.trim(),
+      name, city, barangay,
       deliveryFee: fee, active: req.body.active,
     });
     if (!zone) return res.status(404).json({ message: 'Delivery zone not found.' });
@@ -65,7 +73,9 @@ const createVehicle = async (req, res) => {
   try {
     const plateNumber = String(req.body.plate_number || '').trim().toUpperCase();
     const description = String(req.body.description || '').trim();
-    if (!plateNumber) return res.status(400).json({ message: 'Vehicle plate number is required.' });
+    if (!plateNumber || plateNumber.length > 24 || description.length > 120) {
+      return res.status(400).json({ message: 'Provide a plate number (24 characters max) and description (120 characters max).' });
+    }
     res.status(201).json(await deliveryModel.createVehicle({ plateNumber, description }));
   } catch (error) { sendError(res, error, 'Could not create vehicle.'); }
 };
@@ -74,7 +84,8 @@ const updateVehicle = async (req, res) => {
   try {
     const id = parseId(req.params.id);
     const plateNumber = String(req.body.plate_number || '').trim().toUpperCase();
-    if (!id || !plateNumber || typeof req.body.active !== 'boolean') {
+    if (!id || !plateNumber || plateNumber.length > 24 || String(req.body.description || '').trim().length > 120 ||
+        typeof req.body.active !== 'boolean') {
       return res.status(400).json({ message: 'Provide a plate number and active flag.' });
     }
     const vehicle = await deliveryModel.updateVehicle(id, {
@@ -98,7 +109,9 @@ const createRider = async (req, res) => {
     const phone = String(req.body.phone || '').trim();
     const vehicleId = req.body.vehicle_id ? parseId(req.body.vehicle_id) : null;
     const zoneIds = Array.isArray(req.body.zone_ids) ? req.body.zone_ids.map(parseId) : [];
-    if (!name || !email || password.length < 8 || (req.body.vehicle_id && !vehicleId) || zoneIds.some((id) => !id)) {
+    if (!name || name.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 100 ||
+        password.length < 8 || Buffer.byteLength(password, 'utf8') > 72 || phone.length > 30 ||
+        (req.body.vehicle_id && !vehicleId) || zoneIds.some((id) => !id)) {
       return res.status(400).json({ message: 'Provide a name, valid email, 8-character password, and valid vehicle/zone IDs.' });
     }
     const passwordHash = await bcrypt.hash(password, 10);
@@ -113,7 +126,8 @@ const updateRider = async (req, res) => {
     const vehicleId = req.body.vehicle_id ? parseId(req.body.vehicle_id) : null;
     const zoneIds = Array.isArray(req.body.zone_ids) ? req.body.zone_ids.map(parseId) : [];
     const availability = req.body.availability || 'available';
-    if (!id || !String(req.body.name || '').trim() || typeof req.body.active !== 'boolean' ||
+    if (!id || !String(req.body.name || '').trim() || String(req.body.name || '').trim().length > 100 ||
+        String(req.body.phone || '').trim().length > 30 || typeof req.body.active !== 'boolean' ||
         !['available', 'busy', 'unavailable'].includes(availability) ||
         (req.body.vehicle_id && !vehicleId) || zoneIds.some((zoneId) => !zoneId)) {
       return res.status(400).json({ message: 'Provide valid rider details, status, vehicle, and coverage zones.' });
@@ -182,8 +196,13 @@ const acceptShipment = async (req, res) => {
 };
 
 const updateRiderShipment = async (req, res) => {
-  const uploadedPath = req.file?.path || null;
+  let uploadedPath = req.file?.path || null;
   try {
+    if (req.file && !(await validateProofPhotoFile(req.file))) {
+      fs.unlink(req.file.path, () => {});
+      return res.status(400).json({ message: 'Proof photo content must be a valid JPEG, PNG, or WebP image.' });
+    }
+    uploadedPath = req.file?.path || null;
     const id = parseId(req.params.id);
     const { status, otp, recipient_name: recipientName, proof_confirmed: proofConfirmed, failure_reason: failureReason,
       rescheduled_for: rescheduledFor, actual_cod: actualCod, note } = req.body;
@@ -266,7 +285,7 @@ const remitCod = async (req, res) => {
   try {
     const shipmentId = parseId(req.params.id);
     const amount = Number(req.body.actual_amount);
-    if (!shipmentId || !Number.isFinite(amount) || amount < 0) {
+    if (!shipmentId || !validMoney(amount)) {
       return res.status(400).json({ message: 'Provide a valid remitted amount.' });
     }
     res.json(await deliveryModel.remitCod(shipmentId, req.user.id, amount, req.body.notes));

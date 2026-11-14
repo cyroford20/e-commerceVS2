@@ -1,4 +1,9 @@
 const productModel = require('../models/productModel');
+const parseId = (value) => {
+  if (!/^[1-9]\d*$/.test(String(value || ''))) return null;
+  const id = Number(value);
+  return Number.isSafeInteger(id) ? id : null;
+};
 
 // GET /api/products
 const getAllProducts = async (req, res) => {
@@ -11,10 +16,24 @@ const getAllProducts = async (req, res) => {
   }
 };
 
-// GET /api/products/barcode/:barcode
+const getOwnerProducts = async (req, res) => {
+  try {
+    res.json(await productModel.getAll({ includeInactive: true }));
+  } catch (error) {
+    console.error('Get owner products error:', error);
+    res.status(500).json({ message: 'Server error fetching products.' });
+  }
+};
+
+// GET /api/products/barcode?code=...
 const getProductByBarcode = async (req, res) => {
   try {
-    const product = await productModel.getByBarcode(req.params.barcode);
+    const rawBarcode = typeof req.query.code === 'string' ? req.query.code : req.params.barcode;
+    const barcode = typeof rawBarcode === 'string' ? rawBarcode.trim() : '';
+    if (!barcode || barcode.length > 64 || /[\u0000-\u001f\u007f]/.test(barcode)) {
+      return res.status(400).json({ message: 'Provide a valid barcode of 1 to 64 characters.' });
+    }
+    const product = await productModel.getByBarcode(barcode);
     if (!product) {
       return res.status(404).json({ message: 'Product not found for this barcode.' });
     }
@@ -28,7 +47,9 @@ const getProductByBarcode = async (req, res) => {
 // GET /api/products/:id
 const getProductById = async (req, res) => {
   try {
-    const product = await productModel.getById(req.params.id);
+    const id = parseId(req.params.id);
+    if (!id) return res.status(400).json({ message: 'Invalid product ID.' });
+    const product = await productModel.getById(id);
 
     if (!product) {
       return res.status(404).json({ message: 'Product not found.' });
@@ -52,14 +73,20 @@ const parseProduct = (body) => {
   if (!name) {
     return { error: 'Product name is required.' };
   }
-  if (!Number.isFinite(price) || price <= 0) {
-    return { error: 'Price must be greater than 0.' };
+  if (name.length > 100 || category.length > 50) {
+    return { error: 'Product name must be 100 characters or fewer and category 50 characters or fewer.' };
   }
-  if (!Number.isInteger(stock) || stock < 0) {
+  if (!Number.isFinite(price) || price <= 0 || price > 99999999.99) {
+    return { error: 'Price must be greater than 0 and within the supported range.' };
+  }
+  if (!Number.isSafeInteger(stock) || stock < 0 || stock > 2147483647) {
     return { error: 'Stock must be a whole number, 0 or more.' };
   }
-  if (barcode.length > 64) {
-    return { error: 'Barcode must be 64 characters or fewer.' };
+  if (barcode.length > 64 || /[\u0000-\u001f\u007f]/.test(barcode)) {
+    return { error: 'Barcode must be 64 characters or fewer and contain no control characters.' };
+  }
+  if (body.active !== undefined && typeof body.active !== 'boolean') {
+    return { error: 'Product active status must be true or false.' };
   }
 
   return {
@@ -70,6 +97,7 @@ const parseProduct = (body) => {
       stock,
       image_url,
       barcode: barcode || null,
+      active: body.active,
     },
   };
 };
@@ -86,7 +114,13 @@ const createProduct = async (req, res) => {
     res.status(201).json(product);
   } catch (error) {
     if (error.code === '23505' && error.constraint?.includes('barcode')) {
-      return res.status(400).json({ message: 'A product with this barcode already exists.' });
+      const conflict = await productModel.getBarcodeConflict(String(req.body.barcode || '').trim()).catch(() => null);
+      return res.status(409).json({
+        message: conflict
+          ? `This barcode is already assigned to ${conflict.name} (product #${conflict.id}).`
+          : 'A product with this barcode already exists.',
+        conflict_product: conflict ? { id: conflict.id, name: conflict.name } : null,
+      });
     }
     console.error('Create product error:', error);
     res.status(500).json({ message: 'Server error creating product.' });
@@ -96,12 +130,14 @@ const createProduct = async (req, res) => {
 // PUT /api/products/:id
 const updateProduct = async (req, res) => {
   try {
+    const id = parseId(req.params.id);
+    if (!id) return res.status(400).json({ message: 'Invalid product ID.' });
     const parsed = parseProduct(req.body);
     if (parsed.error) {
       return res.status(400).json({ message: parsed.error });
     }
 
-    const product = await productModel.update(req.params.id, parsed.value);
+    const product = await productModel.update(id, parsed.value);
     if (!product) {
       return res.status(404).json({ message: 'Product not found.' });
     }
@@ -109,7 +145,14 @@ const updateProduct = async (req, res) => {
     res.json(product);
   } catch (error) {
     if (error.code === '23505' && error.constraint?.includes('barcode')) {
-      return res.status(400).json({ message: 'A product with this barcode already exists.' });
+      const conflict = await productModel.getBarcodeConflict(String(req.body.barcode || '').trim()).catch(() => null);
+      return res.status(409).json({
+        message: conflict && conflict.id !== id
+          ? `This barcode is already assigned to ${conflict.name} (product #${conflict.id}).`
+          : 'A product with this barcode already exists.',
+        conflict_product: conflict && conflict.id !== id
+          ? { id: conflict.id, name: conflict.name } : null,
+      });
     }
     console.error('Update product error:', error);
     res.status(500).json({ message: 'Server error updating product.' });
@@ -119,7 +162,9 @@ const updateProduct = async (req, res) => {
 // DELETE /api/products/:id
 const deleteProduct = async (req, res) => {
   try {
-    const product = await productModel.remove(req.params.id);
+    const id = parseId(req.params.id);
+    if (!id) return res.status(400).json({ message: 'Invalid product ID.' });
+    const product = await productModel.remove(id);
     if (!product) {
       return res.status(404).json({ message: 'Product not found.' });
     }
@@ -137,6 +182,7 @@ const deleteProduct = async (req, res) => {
 
 module.exports = {
   getAllProducts,
+  getOwnerProducts,
   getProductById,
   getProductByBarcode,
   createProduct,

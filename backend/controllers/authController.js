@@ -2,11 +2,12 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const userModel = require('../models/userModel');
 const deliveryModel = require('../models/deliveryModel');
+const jwtSecret = require('../config/jwtSecret');
 
 const signToken = (user) =>
   jwt.sign(
     { id: user.id, email: user.email, name: user.name, role: user.role },
-    process.env.JWT_SECRET || 'vape_shop_secret_key_12345',
+    jwtSecret,
     { expiresIn: '7d' }
   );
 

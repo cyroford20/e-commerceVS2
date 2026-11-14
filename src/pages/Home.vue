@@ -75,8 +75,13 @@
             placeholder="Search products..."
             debounce="300"
           ></ion-searchbar>
-          <BarcodeScannerButton label="Scan a product barcode" @scanned="findScannedProduct" />
-          <p v-if="scanError" class="scan-error">{{ scanError }}</p>
+          <BarcodeScannerButton
+            label="Scan a product barcode"
+            :disabled="scanLoading"
+            @scanned="findScannedProduct"
+          />
+          <p v-if="scanLoading" class="scan-error" role="status">Looking up scanned product...</p>
+          <p v-else-if="scanError" class="scan-error" role="status">{{ scanError }}</p>
 
           <div class="category-row">
             <button
@@ -151,6 +156,7 @@ const vaporAStyle = ref({});
 const vaporBStyle = ref({});
 const loggedIn = ref(false);
 const scanError = ref('');
+const scanLoading = ref(false);
 
 const categories = computed(() => {
   const cats = products.value.map((p) => p.category).filter(Boolean);
@@ -197,12 +203,15 @@ const goCustomize = () => router.push('/customize');
 
 const findScannedProduct = async (barcode) => {
   scanError.value = '';
+  scanLoading.value = true;
   try {
     const response = await getProductByBarcode(barcode);
     router.push(`/product/${response.data.id}`);
   } catch (error) {
     scanError.value =
       error.response?.data?.message || 'No catalog product matches that barcode.';
+  } finally {
+    scanLoading.value = false;
   }
 };
 

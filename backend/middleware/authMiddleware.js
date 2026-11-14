@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const userModel = require('../models/userModel');
+const jwtSecret = require('../config/jwtSecret');
 
 // Middleware to verify JWT token and load the current account
 const authenticate = async (req, res, next) => {
@@ -15,7 +16,7 @@ const authenticate = async (req, res, next) => {
   try {
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET || 'vape_shop_secret_key_12345'
+      jwtSecret
     );
     const user = await userModel.findById(decoded.id);
     if (!user) {

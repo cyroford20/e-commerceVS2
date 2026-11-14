@@ -8,7 +8,7 @@
 
     <p v-if="error" class="notice error">{{ error }}</p>
     <p v-if="message" class="notice success">{{ message }}</p>
-    <div v-if="loading" class="empty">Loading delivery recordsâ€¦</div>
+    <div v-if="loading" class="empty">Loading delivery records?</div>
 
     <template v-else>
       <section v-if="section === 'overview'" class="panel-grid">
@@ -46,7 +46,7 @@
           <header><h3>Rider performance</h3><span>Completed outcomes</span></header>
           <div v-for="rider in riders" :key="rider.id" class="performance-row">
             <span>{{ rider.name }}</span><div class="performance-track"><i :style="{ width: `${rider.success_rate || 0}%` }"></i></div>
-            <b>{{ rider.success_rate || 0 }}%</b><small>{{ rider.delivered_count }} delivered Â· {{ rider.failed_count }} failed</small>
+            <b>{{ rider.success_rate || 0 }}%</b><small>{{ rider.delivered_count }} delivered ? {{ rider.failed_count }} failed</small>
           </div>
         </article>
         <article class="panel">
@@ -54,7 +54,7 @@
           <div class="cash-summary"><p><span>Delivery fees</span><strong>PHP {{ money(dashboard.delivery_fees_collected) }}</strong></p><p><span>Success rate</span><strong>{{ dashboard.success_rate || 0 }}%</strong></p><p><span>Failed rate</span><strong>{{ dashboard.failure_rate || 0 }}%</strong></p></div>
         </article>
         <article class="panel">
-          <header><h3>Todayâ€™s COD</h3><span>Collection totals</span></header>
+          <header><h3>Today?s COD</h3><span>Collection totals</span></header>
           <div class="cash-summary">
             <p><span>Expected</span><strong>PHP {{ money(dashboard.cod?.expected) }}</strong></p>
             <p><span>Collected</span><strong>PHP {{ money(dashboard.cod?.actual) }}</strong></p>
@@ -79,10 +79,10 @@
         <article v-for="shipment in filteredShipments" :key="shipment.id" class="shipment-card">
           <div class="shipment-head">
             <div><span class="code">{{ shipment.shipment_code }}</span><span class="pill">{{ label(shipment.status) }}</span>
-              <h4>Order #{{ shipment.order_id }} Â· {{ shipment.customer_name || 'Customer' }}</h4>
-              <p>{{ shipment.delivery_address }} Â· {{ shipment.delivery_phone }}</p>
+              <h4>Order #{{ shipment.order_id }} ? {{ shipment.customer_name || 'Customer' }}</h4>
+              <p>{{ shipment.delivery_address }} ? {{ shipment.delivery_phone }}</p>
               <small v-if="shipment.delivery_instructions">Instructions: {{ shipment.delivery_instructions }}</small>
-              <small>{{ shipment.zone_name || 'No zone' }} Â· delivery PHP {{ money(shipment.delivery_fee) }} Â· order PHP {{ money(shipment.order_total) }}</small>
+              <small>{{ shipment.zone_name || 'No zone' }} ? delivery PHP {{ money(shipment.delivery_fee) }} ? order PHP {{ money(shipment.order_total) }}</small>
             </div>
             <div class="rider-info">
               <strong>{{ shipment.rider_name || 'No rider assigned' }}</strong>
@@ -100,24 +100,24 @@
             <select v-model="assignment[shipment.id]">
               <option value="">Choose available rider</option>
               <option v-for="rider in assignableRiders(shipment)" :key="rider.id" :value="String(rider.id)">
-                {{ rider.name }} Â· {{ rider.workload }} queued
+                {{ rider.name }} ? {{ rider.workload }} queued
               </option>
             </select>
             <button class="primary" :disabled="!assignment[shipment.id] || busyId === shipment.id" @click="assign(shipment)">Assign</button>
             <button class="secondary" :disabled="busyId === shipment.id" @click="autoAssign(shipment)">Auto assign</button>
           </div>
           <details v-if="shipment.history?.length || shipment.attempts?.length">
-            <summary>History ({{ shipment.history?.length || 0 }}) Â· attempts ({{ shipment.attempts?.length || 0 }})</summary>
+            <summary>History ({{ shipment.history?.length || 0 }}) ? attempts ({{ shipment.attempts?.length || 0 }})</summary>
             <div v-for="event in shipment.history" :key="event.id" class="history-line">
               <b>{{ label(event.status) }}</b><span>{{ event.note }}</span><small>{{ dateTime(event.created_at) }}</small>
             </div>
             <div v-for="record in shipment.assignment_history" :key="`assignment-${record.id}`" class="history-line">
-              <b>{{ record.rider_name }} Â· {{ label(record.state) }}</b><span>Assigned by {{ record.assigned_by || 'system' }}</span>
-              <small>{{ dateTime(record.assigned_at) }}<template v-if="record.accepted_at"> Â· accepted {{ dateTime(record.accepted_at) }}</template></small>
+              <b>{{ record.rider_name }} ? {{ label(record.state) }}</b><span>Assigned by {{ record.assigned_by || 'system' }}</span>
+              <small>{{ dateTime(record.assigned_at) }}<template v-if="record.accepted_at"> ? accepted {{ dateTime(record.accepted_at) }}</template></small>
             </div>
             <div v-for="attempt in shipment.attempts" :key="`attempt-${attempt.id}`" class="history-line">
               <b>{{ label(attempt.result) }}</b><span>{{ label(attempt.failure_reason) }} {{ attempt.notes }}</span>
-              <small>{{ dateTime(attempt.attempted_at) }}<template v-if="attempt.rescheduled_for"> Â· new time {{ dateTime(attempt.rescheduled_for) }}</template></small>
+              <small>{{ dateTime(attempt.attempted_at) }}<template v-if="attempt.rescheduled_for"> ? new time {{ dateTime(attempt.rescheduled_for) }}</template></small>
             </div>
           </details>
           <div v-if="shipment.status === 'delivered' && shipment.payment_method === 'cod' && !shipment.cod_remitted_at" class="remit-row">
@@ -136,9 +136,9 @@
           <input v-model="riderForm.email" required type="email" placeholder="Email / login" />
           <input v-model="riderForm.password" required minlength="8" type="password" placeholder="Temporary password (8+ characters)" />
           <input v-model="riderForm.phone" type="tel" placeholder="Phone" />
-          <select v-model="riderForm.vehicle_id"><option value="">No vehicle</option><option v-for="vehicle in activeVehicles" :key="vehicle.id" :value="String(vehicle.id)">{{ vehicle.plate_number }} Â· {{ vehicle.description }}</option></select>
+          <select v-model="riderForm.vehicle_id"><option value="">No vehicle</option><option v-for="vehicle in activeVehicles" :key="vehicle.id" :value="String(vehicle.id)">{{ vehicle.plate_number }} ? {{ vehicle.description }}</option></select>
           <select v-model="riderForm.zone_ids" multiple aria-label="Zones this rider covers"><option v-for="zone in zones" :key="zone.id" :value="String(zone.id)">{{ zone.name }}</option></select>
-          <button class="primary" :disabled="saving">{{ saving ? 'Creatingâ€¦' : 'Create rider' }}</button>
+          <button class="primary" :disabled="saving">{{ saving ? 'Creating?' : 'Create rider' }}</button>
         </form>
         <p class="form-hint">Choose coverage zones with Ctrl or Command. Riders without zones configured can cover any zone for automatic assignment.</p>
         <div class="rider-list">
@@ -149,7 +149,7 @@
               <input v-model="rider.phone" aria-label="Rider phone" placeholder="Phone" />
               <select v-model="rider.vehicle_id"><option value="">No vehicle</option><option v-for="vehicle in activeVehicles" :key="vehicle.id" :value="String(vehicle.id)">{{ vehicle.plate_number }}</option></select>
               <select v-model="rider.edit_zone_ids" multiple aria-label="Rider coverage zones"><option v-for="zone in zones" :key="zone.id" :value="String(zone.id)">{{ zone.name }}</option></select>
-              <small>{{ rider.workload }} open assignment(s) Â· {{ rider.delivered_count }} delivered Â· {{ rider.success_rate }}% success</small>
+              <small>{{ rider.workload }} open assignment(s) ? {{ rider.delivered_count }} delivered ? {{ rider.success_rate }}% success</small>
             </div>
             <select :value="rider.availability" @change="saveRider(rider, { availability: $event.target.value })"><option value="available">Available</option><option value="unavailable">Unavailable</option></select>
             <button class="secondary" @click="saveRider(rider, {})">Save details</button>
@@ -205,13 +205,15 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import {
   assignShipment, autoAssignShipment, createDeliveryRider, createDeliveryVehicle,
   createDeliveryZone, getAdminDeliveryDashboard, getAdminDeliveryZones,
   getAdminShipments, getCodSummary, getDeliveryRiders, getDeliveryVehicles,
   remitShipmentCod, updateDeliveryRider, updateDeliveryVehicle, updateDeliveryZone, updateShipmentEta,
 } from '../services/api';
+
+const props = defineProps({ active: { type: Boolean, default: true } });
 
 const sections = [
   { id: 'overview', label: 'Overview' }, { id: 'shipments', label: 'Shipments' },
@@ -381,11 +383,12 @@ const remit = async (shipment) => {
   finally { busyId.value = null; }
 };
 
-onMounted(async () => {
-  await loadAll();
-  await loadCod();
-  pollTimer = window.setInterval(loadAll, 15000);
-});
+watch(() => props.active, async (active) => {
+  window.clearInterval(pollTimer);
+  if (!active) return;
+  await Promise.all([loadAll(), loadCod()]);
+  if (props.active) pollTimer = window.setInterval(loadAll, 15000);
+}, { immediate: true });
 onBeforeUnmount(() => window.clearInterval(pollTimer));
 </script>
 

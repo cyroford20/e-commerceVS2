@@ -42,7 +42,7 @@
               <p class="meta">{{ order.shipment?.shipment_code || ('Order #' + order.id) }} · {{ formatDate(order.created_at) }}</p>
               <span class="delivery-status">{{ formatStatus(order.delivery_status) }}</span>
             </div>
-            <strong class="price-text">â‚±{{ formatPrice(order.total) }}</strong>
+            <strong class="price-text">PHP {{ formatPrice(order.total) }}</strong>
           </div>
 
           <div class="order-items">
@@ -50,7 +50,7 @@
               <img :src="item.image_url" :alt="item.product_name" />
               <div>
                 <h3>{{ item.product_name }}</h3>
-                <p>Qty {{ item.quantity }} Ã— â‚±{{ formatPrice(item.price) }}</p>
+                <p>Qty {{ item.quantity }} ? PHP {{ formatPrice(item.price) }}</p>
               </div>
             </div>
           </div>
@@ -62,7 +62,7 @@
           <div v-if="order.delivery_address" class="delivery-details">
             <strong>Delivery</strong>
             <span v-if="order.shipment?.estimated_delivery_at">Estimated arrival: {{ formatDate(order.shipment.estimated_delivery_at) }}</span>
-            <span v-if="order.shipment">Zone: {{ order.shipment.zone_name }} Â· Fee PHP {{ formatPrice(order.shipment.delivery_fee) }}</span>
+            <span v-if="order.shipment">Zone: {{ order.shipment.zone_name }} ? Fee PHP {{ formatPrice(order.shipment.delivery_fee) }}</span>
             <span>{{ order.delivery_address }}</span>
             <span v-if="order.delivery_instructions">Instructions: {{ order.delivery_instructions }}</span>
             <span>{{ order.delivery_phone }}</span>
@@ -85,7 +85,7 @@
             <small v-if="order.delivery_location && isTrackable(order)">
               Courier location updated {{ formatDate(order.delivery_location.recorded_at) }}
               <span v-if="isLocationStale(order.delivery_location)" class="stale-label">
-                Â· Stale â€” waiting for a newer update
+                ? Stale ? waiting for a newer update
               </span>
             </small>
             <small v-else-if="isTrackable(order)" class="tracking-waiting">
@@ -120,8 +120,8 @@
                 <b>{{ formatStatus(event.status) }}</b>
                 <small>
                   {{ event.note }}
-                  <span v-if="event.recipient_name"> Â· Received by {{ event.recipient_name }}</span>
-                  Â· {{ formatDate(event.created_at) }}
+                  <span v-if="event.recipient_name"> ? Received by {{ event.recipient_name }}</span>
+                  ? {{ formatDate(event.created_at) }}
                 </small>
               </div>
             </div>
@@ -133,8 +133,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
-import { IonPage, IonContent, IonButton, IonSpinner } from '@ionic/vue';
+import { ref, computed, onBeforeUnmount } from 'vue';
+import { IonPage, IonContent, IonButton, IonSpinner, onIonViewWillEnter, onIonViewWillLeave } from '@ionic/vue';
 import Navbar from '../components/Navbar.vue';
 import LiveDeliveryMap from '../components/LiveDeliveryMap.vue';
 import {
@@ -149,9 +149,9 @@ let refreshTimer;
 const activeDeliveries = computed(() =>
   orders.value.filter((order) => ['picked_up', 'out_for_delivery'].includes(order.delivery_status))
 );
-const trackableDeliveries = computed(() =>
-  orders.value.filter((order) => isTrackable(order))
-);
+const hasOpenShipments = computed(() => orders.value.some((order) =>
+  !['delivered', 'cancelled', 'return_to_warehouse'].includes(order.delivery_status)
+));
 
 const formatPrice = (price) => parseFloat(price).toFixed(2);
 
@@ -237,15 +237,18 @@ const readNotification = async (notification) => {
 
 const refreshOrders = () => fetchOrders(false);
 
-onMounted(() => fetchOrders());
-onMounted(() => {
+const enterOrdersPage = () => {
+  fetchOrders();
   refreshTimer = window.setInterval(() => {
-    if (trackableDeliveries.value.length) {
+    if (hasOpenShipments.value) {
       refreshOrders();
     }
   }, 15000);
-});
-onBeforeUnmount(() => window.clearInterval(refreshTimer));
+};
+const leaveOrdersPage = () => window.clearInterval(refreshTimer);
+onIonViewWillEnter(enterOrdersPage);
+onIonViewWillLeave(leaveOrdersPage);
+onBeforeUnmount(leaveOrdersPage);
 </script>
 
 <style scoped>

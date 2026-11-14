@@ -1,0 +1,3 @@
+-- Product catalog additions. Safe to apply to existing databases.
+ALTER TABLE products ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE;
+CREATE INDEX IF NOT EXISTS products_active_id_idx ON products(active, id);
