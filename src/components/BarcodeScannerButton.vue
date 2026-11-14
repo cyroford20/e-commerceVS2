@@ -4,7 +4,7 @@
       {{ scanning ? 'Scanning...' : label }}
     </button>
 
-    <div v-if="scanning && isWeb" class="barcode-scanner-overlay">
+    <div v-if="scanning" class="barcode-scanner-overlay">
       <div class="scanner-card">
         <div class="scanner-camera-window">
           <video
@@ -23,7 +23,6 @@
       </div>
     </div>
 
-    <p v-if="statusMessage" class="scanner-status">{{ statusMessage }}</p>
     <p v-if="errorMessage" class="scanner-error">{{ errorMessage }}</p>
   </div>
 </template>
@@ -32,10 +31,7 @@
 import { onBeforeUnmount, ref } from 'vue';
 import 'barcode-detector/polyfill';
 import { Capacitor } from '@capacitor/core';
-import {
-  BarcodeFormat,
-  BarcodeScanner,
-} from '@capacitor-mlkit/barcode-scanning';
+import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 
 defineProps({
   label: { type: String, default: 'Scan barcode' },
@@ -44,31 +40,9 @@ defineProps({
 const emit = defineEmits(['scanned']);
 const scanning = ref(false);
 const errorMessage = ref('');
-const statusMessage = ref('');
 const videoElement = ref(null);
 const isWeb = Capacitor.getPlatform() === 'web';
 let scanListener;
-
-const ensureAndroidScannerModule = async () => {
-  const { available } = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
-  if (available) return;
-
-  statusMessage.value = 'Preparing the barcode scanner…';
-  try {
-    await BarcodeScanner.installGoogleBarcodeScannerModule();
-  } catch (error) {
-    const currentState = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
-    if (!currentState.available) throw error;
-  }
-
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    await new Promise((resolve) => window.setTimeout(resolve, 750));
-    const moduleState = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
-    if (moduleState.available) return;
-  }
-
-  throw new Error('The scanner is still downloading. Check your internet connection and try again.');
-};
 
 const cleanup = async () => {
   document.body.classList.remove('barcode-scanner-active');
@@ -86,52 +60,25 @@ const stopScanner = async () => {
 
 const startScanner = async () => {
   errorMessage.value = '';
-  statusMessage.value = '';
-
-  if (!isWeb) {
-    scanning.value = true;
-    try {
-      const support = await BarcodeScanner.isSupported();
-      if (!support.supported) {
-        throw new Error('This device does not have a camera available for barcode scanning.');
-      }
-
-      if (Capacitor.getPlatform() === 'android') {
-        await ensureAndroidScannerModule();
-      }
-
-      const result = await BarcodeScanner.scan({
-        formats: [
-          BarcodeFormat.Ean8,
-          BarcodeFormat.Ean13,
-          BarcodeFormat.UpcA,
-          BarcodeFormat.UpcE,
-          BarcodeFormat.Code128,
-        ],
-        autoZoom: true,
-      });
-      const value = result.barcodes?.[0]?.rawValue?.trim();
-      if (value) emit('scanned', value);
-    } catch (error) {
-      if (!error.message?.toLowerCase().includes('scan canceled')) {
-        errorMessage.value = error.message || 'Could not open the barcode scanner.';
-      }
-    } finally {
-      scanning.value = false;
-      statusMessage.value = '';
-    }
-    return;
-  }
-
   scanning.value = true;
-  document.body.classList.add('barcode-scanner-active');
 
   try {
     const support = await BarcodeScanner.isSupported();
     if (!support.supported) {
-      throw new Error('Barcode scanning is not supported on this device or browser.');
+      throw new Error('This device does not have a camera available for barcode scanning.');
     }
 
+    if (!isWeb) {
+      const permission = await BarcodeScanner.checkPermissions();
+      if (permission.camera !== 'granted') {
+        const requested = await BarcodeScanner.requestPermissions();
+        if (requested.camera !== 'granted') {
+          throw new Error('Camera permission is required. Allow camera access in app settings and try again.');
+        }
+      }
+    }
+
+    document.body.classList.add('barcode-scanner-active');
     const eventName = isWeb ? 'barcodesScanned' : 'barcodeScanned';
     scanListener = await BarcodeScanner.addListener(eventName, async (result) => {
       const barcode = result.barcode || result.barcodes?.[0];
@@ -141,11 +88,7 @@ const startScanner = async () => {
       emit('scanned', value);
     });
 
-    if (isWeb) {
-      await BarcodeScanner.startScan({ videoElement: videoElement.value });
-    } else {
-      await BarcodeScanner.startScan();
-    }
+    await BarcodeScanner.startScan(isWeb ? { videoElement: videoElement.value } : undefined);
   } catch (error) {
     await cleanup();
     errorMessage.value = error.message || 'Could not start the barcode scanner.';
@@ -188,19 +131,13 @@ onBeforeUnmount(() => {
   font-size: 0.8rem;
 }
 
-.scanner-status {
-  margin: 0;
-  color: #6e5360;
-  font-size: 0.8rem;
-}
-
 .barcode-scanner-overlay {
   position: fixed;
   inset: 0;
   z-index: 10000;
   display: grid;
   place-items: center;
-  background: rgba(5, 5, 5, 0.82);
+  background: rgba(5, 5, 5, 0.4);
   color: #fff;
 }
 
@@ -211,7 +148,7 @@ onBeforeUnmount(() => {
   width: min(90vw, 360px);
   padding: 1.5rem;
   border-radius: 20px;
-  background: rgba(23, 16, 23, 0.82);
+  background: rgba(23, 16, 23, 0.45);
   text-align: center;
 }
 
