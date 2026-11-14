@@ -26,29 +26,52 @@
               placeholder="House number, street, barangay, city"
             ></textarea>
           </label>
+          <label>
+            Delivery zone
+            <select v-model="deliveryZoneId" required>
+              <option value="">Choose your barangay</option>
+              <option v-for="zone in deliveryZones" :key="zone.id" :value="String(zone.id)">
+                {{ zone.barangay }}, {{ zone.city }} - PHP {{ formatPrice(zone.delivery_fee) }}
+              </option>
+            </select>
+          </label>
+          <label>
+            Delivery instructions (optional)
+            <textarea v-model="deliveryInstructions" rows="2" maxlength="1000" placeholder="Gate, landmark, or drop-off details"></textarea>
+          </label>
+          <p v-if="!zonesLoading && deliveryZones.length === 0" class="error-msg">
+            Delivery zones are not set up yet. Contact the store before placing an order.
+          </p>
+          <p class="payment-note">Payment: Cash on delivery</p>
         </div>
 
         <ion-list>
           <ion-item v-for="item in cart" :key="item.id">
             <ion-label>
               <h3>{{ item.name }}</h3>
-              <p>Qty: {{ item.quantity }} × ₱{{ formatPrice(item.price) }}</p>
+              <p>Qty: {{ item.quantity }} x PHP {{ formatPrice(item.price) }}</p>
             </ion-label>
-            <ion-note slot="end" class="price-text">
-              ₱{{ formatPrice(item.price * item.quantity) }}
-            </ion-note>
+            <ion-note slot="end" class="price-text">PHP {{ formatPrice(item.price * item.quantity) }}</ion-note>
           </ion-item>
         </ion-list>
 
         <div class="total-row">
+          <span>Items</span>
+          <span>PHP {{ formatPrice(itemsTotal) }}</span>
+        </div>
+        <div class="total-row">
+          <span>Delivery fee</span>
+          <span>PHP {{ formatPrice(selectedDeliveryFee) }}</span>
+        </div>
+        <div class="total-row grand-total">
           <strong>Total</strong>
-          <strong class="price-text">₱{{ formatPrice(total) }}</strong>
+          <strong class="price-text">PHP {{ formatPrice(total) }}</strong>
         </div>
 
         <ion-button
           expand="block"
           class="ion-margin-top"
-          :disabled="loading"
+          :disabled="loading || zonesLoading || !deliveryZoneId || !deliveryZones.length"
           @click="placeOrder"
         >
           {{ loading ? 'Placing Order...' : 'Place Order' }}
@@ -60,8 +83,8 @@
 
         <ion-toast
           :is-open="successToast"
-          message="Order placed successfully!"
-          duration="2000"
+          :message="successMessage"
+          duration="5000"
           color="success"
           @didDismiss="onSuccessDismiss"
         ></ion-toast>
@@ -90,6 +113,7 @@ import {
   getCartTotal,
   clearCart,
   createOrder,
+  getDeliveryZones,
 } from '../services/api';
 
 const router = useRouter();
@@ -99,14 +123,29 @@ const error = ref('');
 const successToast = ref(false);
 const deliveryPhone = ref('');
 const deliveryAddress = ref('');
+const deliveryInstructions = ref('');
+const deliveryZones = ref([]);
+const deliveryZoneId = ref('');
+const zonesLoading = ref(true);
+const deliveryOtp = ref('');
 
-const total = computed(() => getCartTotal());
+const itemsTotal = computed(() => getCartTotal());
+const selectedZone = computed(() => deliveryZones.value.find((zone) => String(zone.id) === deliveryZoneId.value));
+const selectedDeliveryFee = computed(() => Number(selectedZone.value?.delivery_fee || 0));
+const total = computed(() => itemsTotal.value + selectedDeliveryFee.value);
+const successMessage = computed(() => deliveryOtp.value
+  ? `Order placed. Give your rider delivery code ${deliveryOtp.value} when the order arrives.`
+  : 'Order placed successfully!');
 const formatPrice = (price) => parseFloat(price).toFixed(2);
 
 const placeOrder = async () => {
   error.value = '';
   if (deliveryPhone.value.trim().length < 7 || deliveryAddress.value.trim().length < 10) {
     error.value = 'Enter a valid phone number and complete delivery address.';
+    return;
+  }
+  if (!selectedZone.value) {
+    error.value = 'Choose a delivery zone to continue.';
     return;
   }
   loading.value = true;
@@ -119,15 +158,18 @@ const placeOrder = async () => {
       price: item.price,
     }));
 
-    await createOrder(
+    const response = await createOrder(
       items,
-      total.value,
       deliveryAddress.value.trim(),
-      deliveryPhone.value.trim()
+      deliveryPhone.value.trim(),
+      Number(deliveryZoneId.value),
+      deliveryInstructions.value.trim(),
+      'cod'
     );
 
     clearCart();
     cart.value = [];
+    deliveryOtp.value = response.data.order.delivery_otp || '';
     successToast.value = true;
   } catch (err) {
     error.value =
@@ -142,8 +184,16 @@ const onSuccessDismiss = () => {
   router.push('/orders');
 };
 
-onMounted(() => {
+onMounted(async () => {
   cart.value = getCart();
+  try {
+    const response = await getDeliveryZones();
+    deliveryZones.value = response.data;
+  } catch (err) {
+    error.value = err.response?.data?.message || 'Could not load delivery zones.';
+  } finally {
+    zonesLoading.value = false;
+  }
 });
 </script>
 
@@ -207,7 +257,8 @@ ion-button {
 }
 
 .delivery-form input,
-.delivery-form textarea {
+.delivery-form textarea,
+.delivery-form select {
   width: 100%;
   box-sizing: border-box;
   padding: 0.75rem;

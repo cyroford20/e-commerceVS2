@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const deliveryModel = require('./deliveryModel');
 
 // Ensure channel column exists on older databases
 const ensureChannelColumn = async () => {
@@ -41,11 +42,12 @@ const readyChannel = async () => {
 // Create a new order with items
 const create = async (
   userId,
-  total,
   items,
-  channel = 'online',
-  deliveryAddress = null,
-  deliveryPhone = null
+  deliveryAddress,
+  deliveryPhone,
+  deliveryZoneId,
+  deliveryInstructions = null,
+  paymentMethod = 'cod'
 ) => {
   await readyChannel();
   const client = await pool.connect();
@@ -53,34 +55,86 @@ const create = async (
   try {
     await client.query('BEGIN');
 
+    const zoneResult = await client.query(
+      `SELECT id, delivery_fee FROM delivery_zones WHERE id = $1 AND active = TRUE FOR SHARE`,
+      [deliveryZoneId]
+    );
+    const zone = zoneResult.rows[0];
+    if (!zone) {
+      const err = new Error('Choose an active delivery zone.');
+      err.status = 400;
+      throw err;
+    }
+
+    const requestedQuantities = new Map();
+    for (const item of items) {
+      const productId = Number.parseInt(item.product_id, 10);
+      const quantity = Number.parseInt(item.quantity, 10);
+      if (!productId || !Number.isInteger(quantity) || quantity < 1) {
+        const err = new Error('Each item needs a valid product and quantity.');
+        err.status = 400;
+        throw err;
+      }
+      requestedQuantities.set(productId, (requestedQuantities.get(productId) || 0) + quantity);
+    }
+
+    const pricedItems = [];
+    let itemsTotal = 0;
+    for (const [productId, quantity] of requestedQuantities) {
+      const productResult = await client.query(
+        `SELECT id, price, stock FROM products WHERE id = $1 FOR UPDATE`, [productId]
+      );
+      const product = productResult.rows[0];
+      if (!product) {
+        const err = new Error(`Product #${productId} was not found.`);
+        err.status = 404;
+        throw err;
+      }
+      if (Number(product.stock) < quantity) {
+        const err = new Error(`Not enough stock for product #${productId}.`);
+        err.status = 409;
+        throw err;
+      }
+      const price = Number(product.price);
+      itemsTotal += price * quantity;
+      pricedItems.push({ productId, quantity, price });
+    }
+    const deliveryFee = Number(zone.delivery_fee);
+    const orderTotal = Number((itemsTotal + deliveryFee).toFixed(2));
+
     const orderResult = await client.query(
       `INSERT INTO orders
-       (user_id, total, channel, delivery_address, delivery_phone)
-       VALUES ($1, $2, $3, $4, $5)
+       (user_id, total, channel, delivery_address, delivery_phone, delivery_zone_id,
+        delivery_fee, delivery_instructions, payment_method, payment_status, delivery_status)
+       VALUES ($1, $2, 'online', $3, $4, $5, $6, $7, $8, 'pending', 'ready_for_delivery')
        RETURNING *`,
-      [userId, total, channel, deliveryAddress, deliveryPhone]
+      [userId, orderTotal, deliveryAddress, deliveryPhone, zone.id, deliveryFee, deliveryInstructions, paymentMethod]
     );
     const order = orderResult.rows[0];
     await client.query(
       `INSERT INTO order_delivery_events (order_id, status, note)
-       VALUES ($1, 'pending', 'Order received')`,
+       VALUES ($1, 'ready_for_delivery', 'Order received; shipment ready for dispatch')`,
       [order.id]
     );
 
-    for (const item of items) {
+    for (const item of pricedItems) {
       await client.query(
         'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ($1, $2, $3, $4)',
-        [order.id, item.product_id, item.quantity, item.price]
+        [order.id, item.productId, item.quantity, item.price]
       );
 
       await client.query(
-        'UPDATE products SET stock = stock - $1 WHERE id = $2',
-        [item.quantity, item.product_id]
+        'UPDATE products SET stock = stock - $1 WHERE id = $2 AND stock >= $1',
+        [item.quantity, item.productId]
       );
     }
 
+    const shipment = await deliveryModel.createShipmentForOrder(
+      client, order, zone.id, deliveryFee, paymentMethod
+    );
+
     await client.query('COMMIT');
-    return order;
+    return { ...order, shipment, delivery_otp: shipment.delivery_otp };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -202,13 +256,36 @@ const attachItems = async (orders) => {
       [order.id]
     );
     order.delivery_timeline = timelineResult.rows;
-    const locationResult = await pool.query(
-      `SELECT latitude, longitude, accuracy, recorded_at
-       FROM order_delivery_locations
-       WHERE order_id = $1
-       ORDER BY recorded_at DESC
-       LIMIT 1`,
+    const shipmentResult = await pool.query(
+      `SELECT s.id, s.shipment_code, s.status, s.delivery_fee, s.expected_cod,
+              s.actual_cod, s.cod_remitted_at, s.created_at, s.estimated_delivery_at,
+              z.name AS zone_name, z.city, z.barangay
+       FROM shipments s LEFT JOIN delivery_zones z ON z.id = s.delivery_zone_id
+       WHERE s.order_id = $1 LIMIT 1`,
       [order.id]
+    );
+    order.shipment = shipmentResult.rows[0] || null;
+    if (order.shipment) {
+      const shipmentHistory = await pool.query(
+        `SELECT 'shipment-' || e.id::text AS id, e.status, e.note, e.created_at,
+                actor.name AS delivery_person, p.recipient_name, (p.shipment_id IS NOT NULL) AS proof_confirmed,
+                p.photo_filename
+         FROM shipment_events e
+         LEFT JOIN users actor ON actor.id = e.actor_user_id
+         LEFT JOIN proof_of_delivery p ON p.shipment_id = e.shipment_id AND e.status = 'delivered'
+         WHERE e.shipment_id = $1 ORDER BY e.created_at, e.id`,
+        [order.shipment.id]
+      );
+      order.delivery_timeline = [...order.delivery_timeline, ...shipmentHistory.rows]
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    }
+    const locationResult = await pool.query(
+      order.shipment
+        ? `SELECT latitude, longitude, accuracy, recorded_at
+           FROM delivery_tracking WHERE shipment_id = $1 ORDER BY recorded_at DESC LIMIT 1`
+        : `SELECT latitude, longitude, accuracy, recorded_at
+           FROM order_delivery_locations WHERE order_id = $1 ORDER BY recorded_at DESC LIMIT 1`,
+      [order.shipment ? order.shipment.id : order.id]
     );
     order.delivery_location = locationResult.rows[0] || null;
   }

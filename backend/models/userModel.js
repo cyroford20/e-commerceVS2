@@ -69,6 +69,13 @@ const listDeliveryPersons = async () => {
   return result.rows;
 };
 
+const isActiveDeliveryPerson = async (id) => {
+  const result = await pool.query(
+    `SELECT active FROM rider_profiles WHERE user_id = $1`, [id]
+  );
+  return result.rows[0]?.active === true;
+};
+
 // Shared walk-in account used by in-store POS sales
 const ensureWalkInCustomer = async () => {
   const existing = await findByEmail(WALKIN_EMAIL);
@@ -88,5 +95,6 @@ module.exports = {
   updateProfile,
   listCustomers,
   listDeliveryPersons,
+  isActiveDeliveryPerson,
   ensureWalkInCustomer,
 };

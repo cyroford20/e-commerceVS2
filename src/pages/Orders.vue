@@ -3,6 +3,13 @@
     <Navbar title="My Orders" :show-back="true" />
 
     <ion-content class="page-shell">
+      <section v-if="notifications.length" class="delivery-notifications">
+        <strong>Delivery updates and COD code</strong>
+        <article v-for="notification in notifications" :key="notification.id">
+          <span>{{ notification.message }}</span>
+          <button v-if="!notification.read_at" type="button" @click="readNotification(notification)">Mark read</button>
+        </article>
+      </section>
       <div v-if="loading" class="empty-state">
         <ion-spinner name="crescent"></ion-spinner>
         <p>Loading orders...</p>
@@ -32,10 +39,10 @@
         <article class="order-block" v-for="order in orders" :key="order.id">
           <div class="order-top">
             <div>
-              <p class="meta">Order #{{ order.id }} · {{ formatDate(order.created_at) }}</p>
+              <p class="meta">{{ order.shipment?.shipment_code || ('Order #' + order.id) }} · {{ formatDate(order.created_at) }}</p>
               <span class="delivery-status">{{ formatStatus(order.delivery_status) }}</span>
             </div>
-            <strong class="price-text">₱{{ formatPrice(order.total) }}</strong>
+            <strong class="price-text">â‚±{{ formatPrice(order.total) }}</strong>
           </div>
 
           <div class="order-items">
@@ -43,7 +50,7 @@
               <img :src="item.image_url" :alt="item.product_name" />
               <div>
                 <h3>{{ item.product_name }}</h3>
-                <p>Qty {{ item.quantity }} × ₱{{ formatPrice(item.price) }}</p>
+                <p>Qty {{ item.quantity }} Ã— â‚±{{ formatPrice(item.price) }}</p>
               </div>
             </div>
           </div>
@@ -54,7 +61,10 @@
           />
           <div v-if="order.delivery_address" class="delivery-details">
             <strong>Delivery</strong>
+            <span v-if="order.shipment?.estimated_delivery_at">Estimated arrival: {{ formatDate(order.shipment.estimated_delivery_at) }}</span>
+            <span v-if="order.shipment">Zone: {{ order.shipment.zone_name }} Â· Fee PHP {{ formatPrice(order.shipment.delivery_fee) }}</span>
             <span>{{ order.delivery_address }}</span>
+            <span v-if="order.delivery_instructions">Instructions: {{ order.delivery_instructions }}</span>
             <span>{{ order.delivery_phone }}</span>
             <a
               :href="destinationMapLink(order)"
@@ -75,7 +85,7 @@
             <small v-if="order.delivery_location && isTrackable(order)">
               Courier location updated {{ formatDate(order.delivery_location.recorded_at) }}
               <span v-if="isLocationStale(order.delivery_location)" class="stale-label">
-                · Stale — waiting for a newer update
+                Â· Stale â€” waiting for a newer update
               </span>
             </small>
             <small v-else-if="isTrackable(order)" class="tracking-waiting">
@@ -94,7 +104,8 @@
               </span>
             </div>
             <div class="tracking-steps">
-              <span :class="{ complete: hasReachedStatus(order.delivery_status, 'assigned') }">Assigned</span>
+              <span :class="{ complete: hasReachedStatus(order.delivery_status, 'rider_assigned') }">Rider assigned</span>
+              <span :class="{ complete: hasReachedStatus(order.delivery_status, 'picked_up') }">Picked up</span>
               <span :class="{ complete: hasReachedStatus(order.delivery_status, 'out_for_delivery') }">
                 Out for delivery
               </span>
@@ -109,8 +120,8 @@
                 <b>{{ formatStatus(event.status) }}</b>
                 <small>
                   {{ event.note }}
-                  <span v-if="event.recipient_name"> · Received by {{ event.recipient_name }}</span>
-                  · {{ formatDate(event.created_at) }}
+                  <span v-if="event.recipient_name"> Â· Received by {{ event.recipient_name }}</span>
+                  Â· {{ formatDate(event.created_at) }}
                 </small>
               </div>
             </div>
@@ -126,14 +137,17 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { IonPage, IonContent, IonButton, IonSpinner } from '@ionic/vue';
 import Navbar from '../components/Navbar.vue';
 import LiveDeliveryMap from '../components/LiveDeliveryMap.vue';
-import { getUserOrders, getUser } from '../services/api';
+import {
+  getUserOrders, getUser, getDeliveryNotifications, markDeliveryNotificationRead,
+} from '../services/api';
 
 const orders = ref([]);
 const loading = ref(true);
 const error = ref('');
+const notifications = ref([]);
 let refreshTimer;
 const activeDeliveries = computed(() =>
-  orders.value.filter((order) => order.delivery_status === 'out_for_delivery')
+  orders.value.filter((order) => ['picked_up', 'out_for_delivery'].includes(order.delivery_status))
 );
 const trackableDeliveries = computed(() =>
   orders.value.filter((order) => isTrackable(order))
@@ -170,10 +184,10 @@ const destinationMapLink = (order) =>
   )}`;
 
 const isTrackable = (order) =>
-  ['assigned', 'out_for_delivery'].includes(order.delivery_status);
+  ['rider_assigned', 'accepted_by_rider', 'picked_up', 'out_for_delivery', 'delivery_failed', 'rescheduled'].includes(order.delivery_status);
 
 const hasReachedStatus = (status, target) => {
-  const order = ['pending', 'assigned', 'out_for_delivery', 'delivered'];
+  const order = ['pending', 'ready_for_delivery', 'rider_assigned', 'accepted_by_rider', 'picked_up', 'out_for_delivery', 'delivered'];
   return order.indexOf(status) >= order.indexOf(target);
 };
 
@@ -199,13 +213,25 @@ const fetchOrders = async (showLoading = true) => {
   }
 
   try {
-    const res = await getUserOrders(user.id);
+    const [res, notificationResponse] = await Promise.all([
+      getUserOrders(user.id), getDeliveryNotifications(),
+    ]);
     orders.value = res.data;
+    notifications.value = notificationResponse.data;
   } catch (err) {
     error.value =
       err.response?.data?.message || 'Could not load orders.';
   } finally {
     if (showLoading) loading.value = false;
+  }
+};
+
+const readNotification = async (notification) => {
+  try {
+    await markDeliveryNotificationRead(notification.id);
+    notification.read_at = new Date().toISOString();
+  } catch {
+    error.value = 'Could not mark delivery update as read.';
   }
 };
 
@@ -227,6 +253,30 @@ onBeforeUnmount(() => window.clearInterval(refreshTimer));
   max-width: 720px;
   margin: 0 auto;
   padding: 1.5rem 1.25rem 3rem;
+}
+
+.delivery-notifications {
+  max-width: 720px;
+  margin: 1rem auto 0;
+  padding: .9rem 1rem;
+  border-radius: 14px;
+  background: #fff2f7;
+  color: #54263b;
+}
+
+.delivery-notifications article {
+  display: flex;
+  justify-content: space-between;
+  gap: .7rem;
+  padding-top: .55rem;
+  font-size: .85rem;
+}
+
+.delivery-notifications button {
+  border: 0;
+  background: transparent;
+  color: #a72355;
+  font-weight: 700;
 }
 
 .tracking-refresh {

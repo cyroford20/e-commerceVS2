@@ -10,7 +10,7 @@ import Checkout from '../pages/Checkout.vue';
 import Orders from '../pages/Orders.vue';
 import Profile from '../pages/Profile.vue';
 import Store from '../pages/Store.vue';
-import Delivery from '../pages/Delivery.vue';
+import Delivery from '../pages/RiderDelivery.vue';
 import Customize from '../pages/Customize.vue';
 
 const routes = [

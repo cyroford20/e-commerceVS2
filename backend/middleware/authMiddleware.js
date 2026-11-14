@@ -36,4 +36,16 @@ const requireRole = (...roles) => (req, res, next) => {
   next();
 };
 
-module.exports = { authenticate, requireRole };
+const requireActiveRider = async (req, res, next) => {
+  try {
+    if (!(await userModel.isActiveDeliveryPerson(req.user.id))) {
+      return res.status(403).json({ message: 'This rider account is inactive.' });
+    }
+    next();
+  } catch (error) {
+    console.error('Check rider availability error:', error);
+    res.status(500).json({ message: 'Could not verify rider account.' });
+  }
+};
+
+module.exports = { authenticate, requireRole, requireActiveRider };

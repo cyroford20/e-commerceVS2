@@ -8,55 +8,55 @@ Ionic Vue frontend + Node.js/Express backend + PostgreSQL.
 
 ```
 E-CommerceVapeShop/
-├── backend/
-│   ├── server.js
-│   ├── .env                  ← your DB password & JWT secret
-│   ├── .env.example
-│   ├── package.json
-│   ├── config/
-│   │   └── db.js
-│   ├── models/
-│   │   ├── userModel.js
-│   │   ├── productModel.js
-│   │   └── orderModel.js
-│   ├── controllers/
-│   │   ├── authController.js
-│   │   ├── productController.js
-│   │   └── orderController.js
-│   ├── routes/
-│   │   ├── authRoutes.js
-│   │   ├── productRoutes.js
-│   │   └── orderRoutes.js
-│   └── middleware/
-│       └── authMiddleware.js
-├── database/
-│   ├── schema.sql
-│   └── seed.sql
-├── src/
-│   ├── pages/
-│   │   ├── Login.vue
-│   │   ├── Register.vue
-│   │   ├── Home.vue
-│   │   ├── ProductDetails.vue
-│   │   ├── Cart.vue
-│   │   ├── Checkout.vue
-│   │   └── Orders.vue
-│   ├── components/
-│   │   ├── ProductCard.vue
-│   │   ├── Navbar.vue
-│   │   └── CartItem.vue
-│   ├── services/
-│   │   └── api.js
-│   ├── router/
-│   │   └── index.js
-│   ├── theme/
-│   │   └── variables.css
-│   ├── App.vue
-│   └── main.js
-├── index.html
-├── package.json
-├── vite.config.js
-└── ionic.config.json
+â”œâ”€â”€ backend/
+â”‚   â”œâ”€â”€ server.js
+â”‚   â”œâ”€â”€ .env                  â† your DB password & JWT secret
+â”‚   â”œâ”€â”€ .env.example
+â”‚   â”œâ”€â”€ package.json
+â”‚   â”œâ”€â”€ config/
+â”‚   â”‚   â””â”€â”€ db.js
+â”‚   â”œâ”€â”€ models/
+â”‚   â”‚   â”œâ”€â”€ userModel.js
+â”‚   â”‚   â”œâ”€â”€ productModel.js
+â”‚   â”‚   â””â”€â”€ orderModel.js
+â”‚   â”œâ”€â”€ controllers/
+â”‚   â”‚   â”œâ”€â”€ authController.js
+â”‚   â”‚   â”œâ”€â”€ productController.js
+â”‚   â”‚   â””â”€â”€ orderController.js
+â”‚   â”œâ”€â”€ routes/
+â”‚   â”‚   â”œâ”€â”€ authRoutes.js
+â”‚   â”‚   â”œâ”€â”€ productRoutes.js
+â”‚   â”‚   â””â”€â”€ orderRoutes.js
+â”‚   â””â”€â”€ middleware/
+â”‚       â””â”€â”€ authMiddleware.js
+â”œâ”€â”€ database/
+â”‚   â”œâ”€â”€ schema.sql
+â”‚   â””â”€â”€ seed.sql
+â”œâ”€â”€ src/
+â”‚   â”œâ”€â”€ pages/
+â”‚   â”‚   â”œâ”€â”€ Login.vue
+â”‚   â”‚   â”œâ”€â”€ Register.vue
+â”‚   â”‚   â”œâ”€â”€ Home.vue
+â”‚   â”‚   â”œâ”€â”€ ProductDetails.vue
+â”‚   â”‚   â”œâ”€â”€ Cart.vue
+â”‚   â”‚   â”œâ”€â”€ Checkout.vue
+â”‚   â”‚   â””â”€â”€ Orders.vue
+â”‚   â”œâ”€â”€ components/
+â”‚   â”‚   â”œâ”€â”€ ProductCard.vue
+â”‚   â”‚   â”œâ”€â”€ Navbar.vue
+â”‚   â”‚   â””â”€â”€ CartItem.vue
+â”‚   â”œâ”€â”€ services/
+â”‚   â”‚   â””â”€â”€ api.js
+â”‚   â”œâ”€â”€ router/
+â”‚   â”‚   â””â”€â”€ index.js
+â”‚   â”œâ”€â”€ theme/
+â”‚   â”‚   â””â”€â”€ variables.css
+â”‚   â”œâ”€â”€ App.vue
+â”‚   â””â”€â”€ main.js
+â”œâ”€â”€ index.html
+â”œâ”€â”€ package.json
+â”œâ”€â”€ vite.config.js
+â””â”€â”€ ionic.config.json
 ```
 
 ---
@@ -73,14 +73,14 @@ CREATE DATABASE vape_shop;
 
 ### Run the schema
 
-**Option A – psql (command line):**
+**Option A â€“ psql (command line):**
 
 ```bash
 psql -U postgres -d vape_shop -f database/schema.sql
 psql -U postgres -d vape_shop -f database/seed.sql
 ```
 
-**Option B – pgAdmin:**
+**Option B â€“ pgAdmin:**
 
 1. Connect to PostgreSQL
 2. Open Query Tool on database `vape_shop`
@@ -123,7 +123,7 @@ Connected to PostgreSQL database
 Server running on http://localhost:3000
 ```
 
-Test in browser: [http://localhost:3000](http://localhost:3000) → `{ "message": "Vape Shop API is running!" }`
+Test in browser: [http://localhost:3000](http://localhost:3000) â†’ `{ "message": "Vape Shop API is running!" }`
 
 ---
 
@@ -210,12 +210,12 @@ Cart is also stored in `localStorage` (no backend needed until checkout).
 
 ## 5. App Flow
 
-1. **Register / Login** → JWT saved to `localStorage`
-2. **Home** → fetch products from API
-3. **Product Details** → add to cart (`localStorage`)
-4. **Cart** → adjust quantities
-5. **Checkout** → send order to backend (requires login)
-6. **Orders** → view past orders for the logged-in user
+1. **Register / Login** â†’ JWT saved to `localStorage`
+2. **Home** â†’ fetch products from API
+3. **Product Details** â†’ add to cart (`localStorage`)
+4. **Cart** â†’ adjust quantities
+5. **Checkout** â†’ send order to backend (requires login)
+6. **Orders** â†’ view past orders for the logged-in user
 
 ---
 
@@ -238,31 +238,28 @@ The scanner uses the Capacitor ML Kit plugin on native platforms and the browser
 
 ---
 
-## 7. Delivery management
+## 7. In-house delivery management
 
-Customers enter a delivery phone number and complete address during checkout. Store owners can open **Store → Delivery** to assign a courier and update the status:
+The delivery module extends the existing PostgreSQL `users` and `orders` tables. A new `shipments` row is created in the same transaction as each online order. Orders retain their customer, item, and payment records; no replacement customer or order tables are created.
 
-- Pending
-- Assigned
-- Out for delivery
-- Delivered
-- Cancelled
+On API startup, `backend/server.js` applies the idempotent additions in `database/delivery_management.sql`. A fresh database still needs `database/schema.sql` first. Store owners must add delivery zones and fees in Store -> Delivery before customers can check out. Checkout calculates the fee from the selected zone and currently supports cash on delivery.
 
-The status, address, phone number, and assigned courier are shown in the customer's order history. The delivery columns are added by `database/schema.sql`; re-run that script for an existing database.
+The delivery admin module contains shipment search and filters, assignment history, manual and least-workload automatic rider assignment, rider accounts and availability, rider-zone coverage, company vehicles, zone fees, COD reconciliation, and delivery summaries. Riders sign in through the existing login and see assigned shipments at `/delivery`.
 
-Store owners can create courier accounts from **Store → Delivery**. Couriers sign in at the normal login page and are redirected to `/delivery`, where they can only view assigned orders and update their own delivery status.
+The shipment workflow is Ready for delivery -> Rider assigned -> Accepted by rider -> Picked up -> Out for delivery -> Delivered. A rider records unsuccessful attempts with a reason and notes, then can reschedule or return the shipment to the warehouse. Every transition is written to `shipment_events` and synced to the existing order delivery status.
 
-Every delivery change is recorded in a chronological timeline visible to the customer, store owner, and assigned courier.
+Delivered COD orders require the customer OTP, recipient name, handover confirmation, and cash amount. The customer receives the OTP in checkout and in delivery notifications. Optional proof photos are stored privately. Dispatchers record cash remittance and discrepancies in the COD module.
 
-Couriers must enter the recipient's name and explicitly confirm the handover before an order can be marked delivered.
+Riders can explicitly share GPS while a delivery is out for delivery. The API retains the latest 100 shipment locations. Customers and dispatchers see location updates through the existing Leaflet/OpenStreetMap tracking UI; the rider dashboard refreshes every 15 seconds.
 
-Couriers can accept assigned orders from the delivery dashboard before starting the trip. The dashboard also shows simple assigned, active, delivered, and delivered-today counts.
+### Delivery data relationships
 
-Couriers may also attach one JPEG, PNG, or WebP proof photo when confirming delivery. Photos are limited to 5 MB, stored outside public assets, and can only be retrieved by the order customer, store owner, or assigned courier.
+- `rider_profiles.user_id` references an existing `users.id`; rider login credentials remain in `users`.
+- `rider_profiles.vehicle_id` references `vehicles.id`; `rider_zone_coverage` links riders to `delivery_zones`.
+- `shipments.order_id` uniquely references an existing `orders.id`; `shipments.delivery_zone_id` references `delivery_zones.id`.
+- `rider_assignments`, `delivery_attempts`, `shipment_events`, `proof_of_delivery`, `cod_transactions`, `delivery_notifications`, and `delivery_tracking` all reference `shipments.id` and preserve their timestamps/history.
 
-When a courier changes an assigned order to **Out for delivery**, the delivery dashboard asks for explicit consent before requesting browser location permission and shares the courier's GPS position every 10 seconds. Customer and owner delivery pages refresh location data every 15 seconds and can open a Google Maps route using the courier's last location and the delivery address. Only the latest location is retained, and updates older than two minutes are shown as stale. Location sharing stops when the order is delivered, cancelled, unassigned, or the courier leaves the dashboard. Google Maps API keys are not required because the app opens Google Maps directions links instead of embedding the Google Maps JavaScript SDK.
-
-Customer order tracking also includes a key-free OpenStreetMap/Leaflet map. It displays the latest courier marker, geocodes the delivery address to a destination marker, and draws a straight-line progress guide between them. The map refreshes with the existing 15-second order polling, while Google Maps remains available for turn-by-turn navigation.
+### Optional embedded Google Maps setup
 
 ### Optional embedded Google Maps setup
 
@@ -321,10 +318,10 @@ Android emulator can use `http://10.0.2.2:3000/api` to reach a host machine back
 
 **CI**
 
-- `.github/workflows/android.yml` → builds and uploads a **debug APK**
-- `.github/workflows/ios.yml` → builds an **iOS Simulator** `.app` (no App Store signing)
+- `.github/workflows/android.yml` â†’ builds and uploads a **debug APK**
+- `.github/workflows/ios.yml` â†’ builds an **iOS Simulator** `.app` (no App Store signing)
 
-Optional repo variable: `VITE_API_URL` (Settings → Variables).
+Optional repo variable: `VITE_API_URL` (Settings â†’ Variables).
 
 **Neon database**
 
@@ -338,7 +335,7 @@ automatically, so `npm start` can use the linked Neon branch without copying sec
 **Deploy the backend to Render**
 
 The root `render.yaml` is a Render Blueprint for the Express API. In Render, choose
-**New → Blueprint**, connect this repository, and select `render.yaml`. After the
+**New â†’ Blueprint**, connect this repository, and select `render.yaml`. After the
 service is created, add the production Neon pooled `DATABASE_URL` as a secret
 environment variable. Render generates `JWT_SECRET` automatically. Copy the
 deployed API URL, then create a root `.env` before building the mobile app:

@@ -9,18 +9,16 @@ const createOrder = async (req, res) => {
   try {
     const {
       items,
-      total,
       delivery_address: deliveryAddress,
       delivery_phone: deliveryPhone,
+      delivery_zone_id: deliveryZoneId,
+      delivery_instructions: deliveryInstructions,
+      payment_method: paymentMethod = 'cod',
     } = req.body;
     const userId = req.user.id;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'Order must have at least one item.' });
-    }
-
-    if (!total || total <= 0) {
-      return res.status(400).json({ message: 'Invalid order total.' });
     }
 
     if (
@@ -42,13 +40,21 @@ const createOrder = async (req, res) => {
       }
     }
 
+    if (!Number.isInteger(Number(deliveryZoneId)) || Number(deliveryZoneId) < 1) {
+      return res.status(400).json({ message: 'Choose a delivery zone.' });
+    }
+    if (paymentMethod !== 'cod') {
+      return res.status(400).json({ message: 'Cash on delivery is the available payment method.' });
+    }
+
     const order = await orderModel.create(
       userId,
-      total,
       items,
-      'online',
       deliveryAddress.trim(),
-      deliveryPhone.trim()
+      deliveryPhone.trim(),
+      Number(deliveryZoneId),
+      typeof deliveryInstructions === 'string' ? deliveryInstructions.trim().slice(0, 1000) : null,
+      paymentMethod
     );
 
     res.status(201).json({
@@ -57,7 +63,9 @@ const createOrder = async (req, res) => {
     });
   } catch (error) {
     console.error('Create order error:', error);
-    res.status(500).json({ message: 'Server error creating order.' });
+    res.status(error.status || 500).json({
+      message: error.status ? error.message : 'Server error creating order.',
+    });
   }
 };
 

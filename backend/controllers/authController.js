@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const userModel = require('../models/userModel');
+const deliveryModel = require('../models/deliveryModel');
 
 const signToken = (user) =>
   jwt.sign(
@@ -156,7 +157,9 @@ const createDeliveryPerson = async (req, res) => {
     }
 
     const hash = await bcrypt.hash(password, 10);
-    const person = await userModel.create(name, email, hash, 'delivery-person');
+    const person = await deliveryModel.createRider({
+      name, email, passwordHash: hash, phone: '', vehicleId: null, zoneIds: [],
+    });
     res.status(201).json({ user: publicUser(person) });
   } catch (error) {
     console.error('Create delivery person error:', error);

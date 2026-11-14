@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const orderController = require('../controllers/orderController');
-const { authenticate, requireRole } = require('../middleware/authMiddleware');
+const { authenticate, requireRole, requireActiveRider } = require('../middleware/authMiddleware');
 const { uploadProofPhoto } = require('../middleware/uploadMiddleware');
 
 const handleProofUpload = (req, res, next) => {
@@ -30,6 +30,7 @@ router.get(
   '/assigned',
   authenticate,
   requireRole('delivery-person'),
+  requireActiveRider,
   orderController.getAssignedDeliveries
 );
 
@@ -37,6 +38,7 @@ router.put(
   '/:id/accept',
   authenticate,
   requireRole('delivery-person'),
+  requireActiveRider,
   orderController.acceptAssignedDelivery
 );
 
@@ -44,6 +46,7 @@ router.put(
   '/:id/delivery-status',
   authenticate,
   requireRole('delivery-person'),
+  requireActiveRider,
   handleProofUpload,
   orderController.updateAssignedDelivery
 );
@@ -52,6 +55,7 @@ router.put(
   '/:id/delivery-location',
   authenticate,
   requireRole('delivery-person'),
+  requireActiveRider,
   orderController.updateDeliveryLocation
 );
 

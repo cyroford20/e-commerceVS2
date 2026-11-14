@@ -51,13 +51,61 @@ export const getProductByBarcode = (barcode) => {
 
 // ---------- ORDERS ----------
 
-export const createOrder = (items, total, deliveryAddress, deliveryPhone) => {
+export const createOrder = (items, deliveryAddress, deliveryPhone, deliveryZoneId, deliveryInstructions = '', paymentMethod = 'cod') => {
   return api.post('/orders', {
     items,
-    total,
     delivery_address: deliveryAddress,
     delivery_phone: deliveryPhone,
+    delivery_zone_id: deliveryZoneId,
+    delivery_instructions: deliveryInstructions,
+    payment_method: paymentMethod,
   });
+};
+
+export const getDeliveryZones = () => api.get('/delivery/zones');
+export const getAdminDeliveryZones = () => api.get('/delivery/zones', { params: { all: true } });
+
+export const getAdminDeliveryDashboard = () => api.get('/delivery/admin/dashboard');
+export const getAdminShipments = (params = {}) => api.get('/delivery/admin/shipments', { params });
+export const assignShipment = (shipmentId, riderId) =>
+  api.post(`/delivery/admin/shipments/${shipmentId}/assign`, { rider_id: riderId });
+export const autoAssignShipment = (shipmentId) =>
+  api.post(`/delivery/admin/shipments/${shipmentId}/auto-assign`);
+export const updateShipmentEta = (shipmentId, estimatedAt) =>
+  api.put(`/delivery/admin/shipments/${shipmentId}/eta`, { estimated_delivery_at: estimatedAt });
+export const getDeliveryRiders = () => api.get('/delivery/admin/riders');
+export const createDeliveryRider = (rider) => api.post('/delivery/admin/riders', rider);
+export const updateDeliveryRider = (id, rider) => api.put(`/delivery/admin/riders/${id}`, rider);
+export const getDeliveryVehicles = () => api.get('/delivery/admin/vehicles');
+export const createDeliveryVehicle = (vehicle) => api.post('/delivery/admin/vehicles', vehicle);
+export const updateDeliveryVehicle = (id, vehicle) => api.put(`/delivery/admin/vehicles/${id}`, vehicle);
+export const createDeliveryZone = (zone) => api.post('/delivery/admin/zones', zone);
+export const updateDeliveryZone = (id, zone) => api.put(`/delivery/admin/zones/${id}`, zone);
+export const getCodSummary = (params = {}) => api.get('/delivery/admin/cod', { params });
+export const remitShipmentCod = (shipmentId, actualAmount, notes = '') =>
+  api.post(`/delivery/admin/shipments/${shipmentId}/cod-remittance`, {
+    actual_amount: actualAmount,
+    notes,
+  });
+export const getRiderShipments = () => api.get('/delivery/rider/shipments');
+export const acceptShipment = (shipmentId) =>
+  api.put(`/delivery/rider/shipments/${shipmentId}/accept`);
+export const updateRiderShipment = (shipmentId, data) => {
+  const body = new FormData();
+  Object.entries(data).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) body.append(key, value);
+  });
+  return api.put(`/delivery/rider/shipments/${shipmentId}/status`, body);
+};
+export const updateShipmentLocation = (shipmentId, latitude, longitude, accuracy) =>
+  api.post(`/delivery/rider/shipments/${shipmentId}/location`, { latitude, longitude, accuracy });
+export const getCustomerShipment = (orderId) =>
+  api.get(`/delivery/customer/orders/${orderId}/shipment`);
+export const getDeliveryNotifications = () => api.get('/delivery/notifications');
+export const markDeliveryNotificationRead = (id) => api.put(`/delivery/notifications/${id}/read`);
+export const getShipmentProof = async (shipmentId) => {
+  const response = await api.get(`/delivery/shipments/${shipmentId}/proof`, { responseType: 'blob' });
+  return URL.createObjectURL(response.data);
 };
 
 export const createPosOrder = (items, customerId = null) => {

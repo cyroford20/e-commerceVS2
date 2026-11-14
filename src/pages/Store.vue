@@ -73,7 +73,7 @@
 
           <header class="topbar" :class="{ compact: tab === 'pos' }">
             <div>
-              <p class="eyebrow">{{ greeting }} · {{ todayLabel }}</p>
+              <p class="eyebrow">{{ greeting }} Â· {{ todayLabel }}</p>
               <h1>{{ pageTitle }}</h1>
               <p class="subhead">{{ pageSubhead }}</p>
             </div>
@@ -125,7 +125,7 @@
               <div>
                 <p class="banner-kicker">Live store pulse</p>
                 <h2>Your catalog is ready to sell.</h2>
-                <p>{{ products.length }} products online · {{ orders.length }} orders tracked</p>
+                <p>{{ products.length }} products online Â· {{ orders.length }} orders tracked</p>
               </div>
               <div class="banner-orb" aria-hidden="true"></div>
             </div>
@@ -180,7 +180,7 @@
                     <img :src="product.image_url" :alt="product.name" />
                     <div>
                       <strong>{{ product.name }}</strong>
-                      <span>{{ product.stock }} left · {{ product.category || 'General' }}</span>
+                      <span>{{ product.stock }} left Â· {{ product.category || 'General' }}</span>
                     </div>
                     <em>{{ Math.max(0, 20 - Number(product.stock)) }} to restock</em>
                   </li>
@@ -217,7 +217,7 @@
                       </td>
                       <td>{{ order.items?.length || 0 }}</td>
                       <td>{{ formatDate(order.created_at) }}</td>
-                      <td class="price-text">₱{{ formatPrice(order.total) }}</td>
+                      <td class="price-text">â‚±{{ formatPrice(order.total) }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -251,7 +251,7 @@
                       <strong>{{ product.name }}</strong>
                       <span class="muted">{{ product.category || 'Uncategorized' }}</span>
                       <div class="pos-sku-meta">
-                        <em>₱{{ formatPrice(product.price) }}</em>
+                        <em>â‚±{{ formatPrice(product.price) }}</em>
                         <span :class="['stock-pill', product.stock < 20 ? 'low' : 'ok']">
                           {{ product.stock }} left
                         </span>
@@ -265,7 +265,7 @@
                 <div class="panel-head">
                   <div>
                     <h3>Sale ticket</h3>
-                    <p class="muted">{{ posItemCount }} items · walk-up checkout</p>
+                    <p class="muted">{{ posItemCount }} items Â· walk-up checkout</p>
                   </div>
                 </div>
 
@@ -274,7 +274,7 @@
                   <select v-model="posCustomerId">
                     <option value="walkin">Walk-in customer</option>
                     <option v-for="customer in customers" :key="customer.id" :value="String(customer.id)">
-                      {{ customer.name }} · {{ customer.email }}
+                      {{ customer.name }} Â· {{ customer.email }}
                     </option>
                   </select>
                 </label>
@@ -288,15 +288,15 @@
                     <img :src="line.image_url" :alt="line.name" />
                     <div class="pos-line-info">
                       <strong>{{ line.name }}</strong>
-                      <span>₱{{ formatPrice(line.price) }} each</span>
+                      <span>â‚±{{ formatPrice(line.price) }} each</span>
                       <div class="pos-qty">
-                        <button type="button" @click="changePosQty(line.id, -1)">−</button>
+                        <button type="button" @click="changePosQty(line.id, -1)">âˆ’</button>
                         <em>{{ line.quantity }}</em>
                         <button type="button" @click="changePosQty(line.id, 1)">+</button>
                       </div>
                     </div>
                     <div class="pos-line-side">
-                      <strong>₱{{ formatPrice(line.price * line.quantity) }}</strong>
+                      <strong>â‚±{{ formatPrice(line.price * line.quantity) }}</strong>
                       <button type="button" class="danger-link" @click="removeFromPos(line.id)">
                         Remove
                       </button>
@@ -307,7 +307,7 @@
                 <div class="pos-footer">
                   <div class="pos-total">
                     <span>Total due</span>
-                    <strong>₱{{ formatPrice(posTotal) }}</strong>
+                    <strong>â‚±{{ formatPrice(posTotal) }}</strong>
                   </div>
                   <p class="form-error" v-if="posError">{{ posError }}</p>
                   <p class="form-ok" v-if="posOk">{{ posOk }}</p>
@@ -425,7 +425,7 @@
                           </div>
                         </div>
                       </td>
-                      <td class="price-text">₱{{ formatPrice(product.price) }}</td>
+                      <td class="price-text">â‚±{{ formatPrice(product.price) }}</td>
                       <td>
                         <div class="row-actions">
                           <button type="button" @click="startEdit(product)">Edit</button>
@@ -458,7 +458,7 @@
                     </div>
                     <div class="order-right">
                       <span class="status">{{ order.channel === 'pos' ? 'POS' : 'Online' }}</span>
-                      <strong class="price-text">₱{{ formatPrice(order.total) }}</strong>
+                      <strong class="price-text">â‚±{{ formatPrice(order.total) }}</strong>
                       <span class="muted">{{ formatDate(order.created_at) }}</span>
                     </div>
                   </div>
@@ -467,7 +467,7 @@
                       <img :src="item.image_url" :alt="item.product_name" />
                       <div>
                         <strong>{{ item.product_name }}</strong>
-                        <span>Qty {{ item.quantity }} · ₱{{ formatPrice(item.price) }}</span>
+                        <span>Qty {{ item.quantity }} Â· â‚±{{ formatPrice(item.price) }}</span>
                       </div>
                     </div>
                   </div>
@@ -477,121 +477,7 @@
           </section>
 
           <section v-if="tab === 'delivery'" class="view">
-            <div class="panel glass">
-              <div class="panel-head">
-                <div>
-                  <h3>Delivery queue</h3>
-                  <p class="muted">{{ deliveryQueue.length }} online deliveries</p>
-                </div>
-              </div>
-              <div v-if="deliveryQueue.length" class="delivery-analytics" aria-label="Delivery analytics">
-                <div class="delivery-analytics-card">
-                  <strong>{{ deliveryAnalytics.total }}</strong>
-                  <span>Total</span>
-                </div>
-                <div class="delivery-analytics-card">
-                  <strong>{{ deliveryAnalytics.unassigned }}</strong>
-                  <span>Unassigned</span>
-                </div>
-                <div class="delivery-analytics-card">
-                  <strong>{{ deliveryAnalytics.active }}</strong>
-                  <span>Active</span>
-                </div>
-                <div class="delivery-analytics-card">
-                  <strong>{{ deliveryAnalytics.delivered }}</strong>
-                  <span>Delivered</span>
-                </div>
-                <div class="delivery-analytics-card">
-                  <strong>{{ deliveryAnalytics.completionRate }}%</strong>
-                  <span>Completion rate</span>
-                </div>
-              </div>
-              <div v-if="deliveryQueue.length === 0" class="panel-empty">
-                No online deliveries are waiting.
-              </div>
-              <div v-else class="delivery-cards">
-                <article class="delivery-card" v-for="order in deliveryQueue" :key="order.id">
-                  <div class="delivery-card-top">
-                    <div>
-                      <p class="order-id">Order #{{ order.id }}</p>
-                      <strong>{{ order.customer_name }}</strong>
-                      <span class="muted">{{ order.customer_email }}</span>
-                    </div>
-                    <strong class="price-text">₱{{ formatPrice(order.total) }}</strong>
-                  </div>
-                  <div class="delivery-address">
-                    <strong>Deliver to</strong>
-                    <span>{{ order.delivery_address || 'Address not provided' }}</span>
-                    <span>{{ order.delivery_phone || 'No phone number' }}</span>
-                    <a
-                      v-if="order.delivery_location"
-                      :href="googleMapsLink(order)"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Open live route in Google Maps
-                    </a>
-                    <small v-if="order.delivery_location">
-                      Courier location updated {{ formatDate(order.delivery_location.recorded_at) }}
-                      <span v-if="isLocationStale(order.delivery_location)"> · Stale</span>
-                    </small>
-                  </div>
-                  <div class="delivery-actions">
-                    <select v-model="deliveryAssignments[order.id]">
-                      <option value="">Unassigned</option>
-                      <option
-                        v-for="person in deliveryPersons"
-                        :key="person.id"
-                        :value="String(person.id)"
-                      >
-                        {{ person.name }}
-                      </option>
-                    </select>
-                    <select v-model="deliveryStatuses[order.id]">
-                      <option value="pending">Pending</option>
-                      <option value="assigned">Assigned</option>
-                      <option value="out_for_delivery">Out for delivery</option>
-                      <option value="delivered">Delivered</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
-                    <button type="button" class="primary-btn" @click="saveDelivery(order)">
-                      Save
-                    </button>
-                  </div>
-                  <div v-if="order.delivery_timeline?.length" class="delivery-timeline">
-                    <strong>Timeline</strong>
-                    <span v-for="event in order.delivery_timeline" :key="event.id">
-                      {{ formatStatus(event.status) }}
-                      <span v-if="event.recipient_name"> · Received by {{ event.recipient_name }}</span>
-                      · {{ formatDate(event.created_at) }}
-                    </span>
-                  </div>
-                </article>
-              </div>
-            </div>
-            <div class="panel glass courier-panel">
-              <div class="panel-head">
-                <div>
-                  <h3>Courier accounts</h3>
-                  <p class="muted">Create accounts for delivery staff.</p>
-                </div>
-              </div>
-              <form class="courier-form" @submit.prevent="createCourier">
-                <input v-model="newCourier.name" required placeholder="Full name" />
-                <input v-model="newCourier.email" required type="email" placeholder="Email" />
-                <input
-                  v-model="newCourier.password"
-                  required
-                  minlength="8"
-                  type="password"
-                  placeholder="Password (8+ characters)"
-                />
-                <button type="submit" class="primary-btn" :disabled="creatingCourier">
-                  {{ creatingCourier ? 'Creating...' : 'Create courier' }}
-                </button>
-              </form>
-              <p v-if="courierMessage" class="muted courier-message">{{ courierMessage }}</p>
-            </div>
+            <DeliveryAdminPanel />
           </section>
 
           <section v-if="tab === 'customers'" class="view">
@@ -626,7 +512,7 @@
                       </td>
                       <td>{{ customer.email }}</td>
                       <td>{{ customer.order_count }}</td>
-                      <td class="price-text">₱{{ formatPrice(customer.total_spent) }}</td>
+                      <td class="price-text">â‚±{{ formatPrice(customer.total_spent) }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -711,6 +597,7 @@ import {
   logout,
 } from '../services/api';
 import BarcodeScannerButton from '../components/BarcodeScannerButton.vue';
+import DeliveryAdminPanel from '../components/DeliveryAdminPanel.vue';
 
 const router = useRouter();
 const tab = ref('dashboard');
@@ -929,7 +816,7 @@ const stats = computed(() => [
   },
   {
     label: 'Revenue',
-    value: `₱${formatPrice(totalRevenue.value)}`,
+    value: `â‚±${formatPrice(totalRevenue.value)}`,
     hint: `${totalStock.value} units in stock`,
     meter: `${Math.min(100, Number(totalRevenue.value) / 50)}%`,
     tone: 'accent',
