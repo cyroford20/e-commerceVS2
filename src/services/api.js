@@ -45,6 +45,10 @@ export const getProductById = (id) => {
   return api.get(`/products/${id}`);
 };
 
+export const getProductByBarcode = (barcode) => {
+  return api.get(`/products/barcode/${encodeURIComponent(barcode)}`);
+};
+
 // ---------- ORDERS ----------
 
 export const createOrder = (items, total, deliveryAddress, deliveryPhone) => {

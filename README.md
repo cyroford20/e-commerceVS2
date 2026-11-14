@@ -230,6 +230,12 @@ Customers can open **Build your vape** from the home page and assemble a setup f
 
 Required parts must be selected before the build can be added. Each selected component is added as its own cart item so the existing checkout, stock, and order-item tracking remain accurate. Component groups are inferred from product categories, so use categories such as `Pod System`, `E-Liquid`, `Salt Nic`, `Coils`, and `Accessories` when creating products.
 
+### Barcode scanning
+
+Store owners can scan a product barcode while creating or editing a catalog product. Customers can scan a barcode from the catalog page to open the matching product. Barcodes are stored in the `products.barcode` column and must be unique.
+
+The scanner uses the Capacitor ML Kit plugin on native platforms and the browser Barcode Detection API with a ZXing polyfill on supported web browsers. Camera permission is required. Run `npm run build:mobile` after installing dependencies so native projects receive the scanner plugin.
+
 ---
 
 ## 7. Delivery management

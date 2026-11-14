@@ -11,6 +11,20 @@ const getAllProducts = async (req, res) => {
   }
 };
 
+// GET /api/products/barcode/:barcode
+const getProductByBarcode = async (req, res) => {
+  try {
+    const product = await productModel.getByBarcode(req.params.barcode);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found for this barcode.' });
+    }
+    res.json(product);
+  } catch (error) {
+    console.error('Get product by barcode error:', error);
+    res.status(500).json({ message: 'Server error fetching product.' });
+  }
+};
+
 // GET /api/products/:id
 const getProductById = async (req, res) => {
   try {
@@ -33,6 +47,7 @@ const parseProduct = (body) => {
   const price = Number(body.price);
   const stock = Number(body.stock);
   const image_url = typeof body.image_url === 'string' ? body.image_url.trim() : '';
+  const barcode = typeof body.barcode === 'string' ? body.barcode.trim() : '';
 
   if (!name) {
     return { error: 'Product name is required.' };
@@ -43,6 +58,9 @@ const parseProduct = (body) => {
   if (!Number.isInteger(stock) || stock < 0) {
     return { error: 'Stock must be a whole number, 0 or more.' };
   }
+  if (barcode.length > 64) {
+    return { error: 'Barcode must be 64 characters or fewer.' };
+  }
 
   return {
     value: {
@@ -51,6 +69,7 @@ const parseProduct = (body) => {
       price,
       stock,
       image_url,
+      barcode: barcode || null,
     },
   };
 };
@@ -66,6 +85,9 @@ const createProduct = async (req, res) => {
     const product = await productModel.create(parsed.value);
     res.status(201).json(product);
   } catch (error) {
+    if (error.code === '23505' && error.constraint?.includes('barcode')) {
+      return res.status(400).json({ message: 'A product with this barcode already exists.' });
+    }
     console.error('Create product error:', error);
     res.status(500).json({ message: 'Server error creating product.' });
   }
@@ -86,6 +108,9 @@ const updateProduct = async (req, res) => {
 
     res.json(product);
   } catch (error) {
+    if (error.code === '23505' && error.constraint?.includes('barcode')) {
+      return res.status(400).json({ message: 'A product with this barcode already exists.' });
+    }
     console.error('Update product error:', error);
     res.status(500).json({ message: 'Server error updating product.' });
   }
@@ -113,6 +138,7 @@ const deleteProduct = async (req, res) => {
 module.exports = {
   getAllProducts,
   getProductById,
+  getProductByBarcode,
   createProduct,
   updateProduct,
   deleteProduct,

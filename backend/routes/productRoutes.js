@@ -8,6 +8,9 @@ const ownerOnly = [authenticate, requireRole('store-owner')];
 // GET /api/products
 router.get('/', productController.getAllProducts);
 
+// Keep this route before /:id so "barcode" is not treated as an id.
+router.get('/barcode/:barcode', productController.getProductByBarcode);
+
 // GET /api/products/:id
 router.get('/:id', productController.getProductById);
 

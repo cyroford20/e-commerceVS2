@@ -30,8 +30,14 @@ CREATE TABLE IF NOT EXISTS products (
   category VARCHAR(50),
   price NUMERIC(10, 2) NOT NULL,
   stock INTEGER DEFAULT 0,
-  image_url TEXT
+  image_url TEXT,
+  barcode VARCHAR(64) UNIQUE
 );
+
+ALTER TABLE products ADD COLUMN IF NOT EXISTS barcode VARCHAR(64);
+CREATE UNIQUE INDEX IF NOT EXISTS products_barcode_unique_idx
+  ON products(barcode)
+  WHERE barcode IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS orders (
   id SERIAL PRIMARY KEY,

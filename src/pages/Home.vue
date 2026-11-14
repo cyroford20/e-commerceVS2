@@ -75,6 +75,8 @@
             placeholder="Search products..."
             debounce="300"
           ></ion-searchbar>
+          <BarcodeScannerButton label="Scan a product barcode" @scanned="findScannedProduct" />
+          <p v-if="scanError" class="scan-error">{{ scanError }}</p>
 
           <div class="category-row">
             <button
@@ -134,7 +136,8 @@ import { useRouter } from 'vue-router';
 import { IonPage, IonContent, IonSearchbar, IonSpinner, IonButton } from '@ionic/vue';
 import Navbar from '../components/Navbar.vue';
 import ProductCard from '../components/ProductCard.vue';
-import { getProducts, isLoggedIn } from '../services/api';
+import { getProducts, getProductByBarcode, isLoggedIn } from '../services/api';
+import BarcodeScannerButton from '../components/BarcodeScannerButton.vue';
 
 const router = useRouter();
 const products = ref([]);
@@ -147,6 +150,7 @@ const photoStyle = ref({});
 const vaporAStyle = ref({});
 const vaporBStyle = ref({});
 const loggedIn = ref(false);
+const scanError = ref('');
 
 const categories = computed(() => {
   const cats = products.value.map((p) => p.category).filter(Boolean);
@@ -190,6 +194,17 @@ const scrollToCatalog = () => {
 const goLogin = () => router.push('/login');
 const goRegister = () => router.push('/register');
 const goCustomize = () => router.push('/customize');
+
+const findScannedProduct = async (barcode) => {
+  scanError.value = '';
+  try {
+    const response = await getProductByBarcode(barcode);
+    router.push(`/product/${response.data.id}`);
+  } catch (error) {
+    scanError.value =
+      error.response?.data?.message || 'No catalog product matches that barcode.';
+  }
+};
 
 const onHeroPointer = (event) => {
   const rect = event.currentTarget.getBoundingClientRect();

@@ -360,6 +360,13 @@
                   Stock
                   <input v-model="form.stock" type="number" min="0" step="1" />
                 </label>
+                <label>
+                  Barcode
+                  <div class="barcode-field">
+                    <input v-model="form.barcode" type="text" inputmode="numeric" placeholder="Scan or enter EAN/UPC" />
+                    <BarcodeScannerButton label="Scan" @scanned="form.barcode = $event" />
+                  </div>
+                </label>
                 <label class="full">
                   Image URL
                   <input v-model="form.image_url" type="text" placeholder="/products/your-image.jfif" />
@@ -703,6 +710,7 @@ import {
   getToken,
   logout,
 } from '../services/api';
+import BarcodeScannerButton from '../components/BarcodeScannerButton.vue';
 
 const router = useRouter();
 const tab = ref('dashboard');
@@ -725,6 +733,7 @@ const emptyForm = () => ({
   category: '',
   price: '',
   stock: '',
+  barcode: '',
   image_url: '',
 });
 
@@ -1039,6 +1048,7 @@ const startEdit = (product) => {
     category: product.category || '',
     price: String(product.price),
     stock: String(product.stock),
+    barcode: product.barcode || '',
     image_url: product.image_url || '',
   };
   formError.value = '';
@@ -1053,6 +1063,7 @@ const saveProduct = async () => {
     category: form.value.category,
     price: Number(form.value.price),
     stock: Number(form.value.stock),
+    barcode: form.value.barcode.trim(),
     image_url: form.value.image_url,
   };
 
@@ -2119,6 +2130,17 @@ onBeforeUnmount(() => window.clearInterval(deliveryRefreshTimer));
   font-family: 'Outfit', sans-serif;
   font-size: 0.95rem;
   background: #fafafa;
+}
+
+.barcode-field {
+  display: flex;
+  gap: 0.45rem;
+  align-items: stretch;
+}
+
+.barcode-field input {
+  min-width: 0;
+  flex: 1;
 }
 
 .preview-row {
