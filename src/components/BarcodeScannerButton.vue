@@ -6,8 +6,17 @@
 
     <div v-if="scanning" class="barcode-scanner-overlay">
       <div class="scanner-card">
-        <video ref="videoElement" class="scanner-video" autoplay muted playsinline></video>
-        <div class="scanner-frame" aria-hidden="true"></div>
+        <div class="scanner-camera-window">
+          <video
+            v-if="isWeb"
+            ref="videoElement"
+            class="scanner-video"
+            autoplay
+            muted
+            playsinline
+          ></video>
+          <div class="scanner-frame" aria-hidden="true"></div>
+        </div>
         <h2>Scan barcode</h2>
         <p>Point the camera at the product barcode.</p>
         <button type="button" class="scanner-cancel" @click="stopScanner">Cancel</button>
@@ -32,6 +41,7 @@ const emit = defineEmits(['scanned']);
 const scanning = ref(false);
 const errorMessage = ref('');
 const videoElement = ref(null);
+const isWeb = Capacitor.getPlatform() === 'web';
 let scanListener;
 
 const cleanup = async () => {
@@ -59,7 +69,6 @@ const startScanner = async () => {
       throw new Error('Barcode scanning is not supported on this device or browser.');
     }
 
-    const isWeb = Capacitor.getPlatform() === 'web';
     const eventName = isWeb ? 'barcodesScanned' : 'barcodeScanned';
     scanListener = await BarcodeScanner.addListener(eventName, async (result) => {
       const barcode = result.barcode || result.barcodes?.[0];
@@ -133,14 +142,22 @@ onBeforeUnmount(() => {
   width: min(90vw, 360px);
   padding: 1.5rem;
   border-radius: 20px;
-  background: #171017;
+  background: rgba(23, 16, 23, 0.82);
   text-align: center;
 }
 
-.scanner-video {
+.scanner-camera-window {
+  position: relative;
   width: 220px;
   height: 140px;
+  overflow: hidden;
   border-radius: 14px;
+  background: transparent;
+}
+
+.scanner-video {
+  width: 100%;
+  height: 100%;
   background: #000;
   object-fit: cover;
 }
@@ -156,11 +173,11 @@ onBeforeUnmount(() => {
 }
 
 .scanner-frame {
-  width: 220px;
-  height: 120px;
+  position: absolute;
+  inset: 10px 0;
   border: 2px solid #ff4d8d;
   border-radius: 14px;
-  box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
 }
 
 .scanner-cancel {
@@ -170,12 +187,25 @@ onBeforeUnmount(() => {
   color: #fff;
 }
 
-:global(body.barcode-scanner-active > *:not(#app)) {
+:global(body.barcode-scanner-active) {
   visibility: hidden;
+  --background: transparent;
+  --ion-background-color: transparent;
+  background: transparent !important;
 }
 
-:global(body.barcode-scanner-active #app > *) {
-  visibility: hidden;
+:global(html.barcode-scanner-active),
+:global(body.barcode-scanner-active ion-app),
+:global(body.barcode-scanner-active ion-router-outlet),
+:global(body.barcode-scanner-active .ion-page),
+:global(body.barcode-scanner-active ion-content) {
+  --background: transparent !important;
+  --ion-background-color: transparent !important;
+  background: transparent !important;
+}
+
+:global(body.barcode-scanner-active #app) {
+  background: transparent !important;
 }
 
 :global(body.barcode-scanner-active .barcode-scanner-overlay) {
