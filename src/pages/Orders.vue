@@ -3,9 +3,9 @@
     <Navbar title="My Orders" :show-back="true" />
 
     <ion-content class="page-shell">
-      <section v-if="notifications.length" class="delivery-notifications">
-        <strong>Delivery updates and COD code</strong>
-        <article v-for="notification in notifications" :key="notification.id">
+      <section v-if="deliveryUpdates.length" class="delivery-notifications">
+        <strong>Delivery updates</strong>
+        <article v-for="notification in deliveryUpdates" :key="notification.id">
           <span>{{ notification.message }}</span>
           <button v-if="!notification.read_at" type="button" @click="readNotification(notification)">Mark read</button>
         </article>
@@ -44,6 +44,25 @@
             </div>
             <strong class="price-text">PHP {{ formatPrice(order.total) }}</strong>
           </div>
+          <section class="delivery-guidance" aria-live="polite">
+            <strong>What happens next?</strong>
+            <p>{{ deliveryGuidance(order) }}</p>
+          </section>
+          <section v-if="deliveryCodeNotification(order)" class="delivery-code-card">
+            <div>
+              <strong>Delivery handover code</strong>
+              <p>Show this to the rider only when your order is being handed to you.</p>
+              <code v-if="deliveryCode(deliveryCodeNotification(order))">{{ deliveryCode(deliveryCodeNotification(order)) }}</code>
+              <span v-else>{{ deliveryCodeNotification(order).message }}</span>
+            </div>
+            <button
+              v-if="!deliveryCodeNotification(order).read_at"
+              type="button"
+              @click="readNotification(deliveryCodeNotification(order))"
+            >
+              Mark seen
+            </button>
+          </section>
 
           <div class="order-items">
             <div class="order-item" v-for="item in order.items" :key="item.id">
@@ -54,7 +73,7 @@
               </div>
             </div>
           </div>
-          <div v-if="isTrackable(order) || mapOpen[order.id]" :id="`delivery-map-${order.id}`">
+          <div v-if="isTrackable(order)" :id="`delivery-map-${order.id}`">
             <LiveDeliveryMap :location="order.delivery_location" />
           </div>
           <div v-if="order.delivery_address" class="delivery-details">
@@ -64,8 +83,8 @@
             <span>{{ order.delivery_address }}</span>
             <span v-if="order.delivery_instructions">Instructions: {{ order.delivery_instructions }}</span>
             <span>{{ order.delivery_phone }}</span>
-            <button type="button" class="tracking-link" @click="openDeliveryMap(order)">
-              {{ isTrackable(order) ? 'View in-app delivery map' : 'Show delivery map' }}
+            <button v-if="isTrackable(order)" type="button" class="tracking-link" @click="openDeliveryMap(order)">
+              View in-app delivery map
             </button>
             <small v-if="order.delivery_location && isTrackable(order)">
               Courier location updated {{ formatDate(order.delivery_location.recorded_at) }}
@@ -78,23 +97,26 @@
             </small>
             <span v-if="order.delivery_person">Courier: {{ order.delivery_person }}</span>
           </div>
-          <div v-if="isTrackable(order)" class="tracking-card">
+          <div v-if="hasDeliveryProgress(order)" class="tracking-card">
             <div class="tracking-card-header">
               <div>
-                <strong>Delivery tracking</strong>
-                <small>{{ trackingMessage(order) }}</small>
+                <strong>{{ isTrackable(order) ? 'Delivery tracking' : 'Delivery progress' }}</strong>
+                <small>{{ isTrackable(order) ? trackingMessage(order) : deliveryGuidance(order) }}</small>
               </div>
-              <span class="live-dot" :class="{ stale: !order.delivery_location || isLocationStale(order.delivery_location) }">
+              <span v-if="isTrackable(order)" class="live-dot" :class="{ stale: !order.delivery_location || isLocationStale(order.delivery_location) }">
                 {{ order.delivery_location && !isLocationStale(order.delivery_location) ? 'LIVE' : 'WAITING' }}
               </span>
             </div>
             <div class="tracking-steps">
-              <span :class="{ complete: hasReachedStatus(order.delivery_status, 'rider_assigned') }">Rider assigned</span>
-              <span :class="{ complete: hasReachedStatus(order.delivery_status, 'picked_up') }">Picked up</span>
-              <span :class="{ complete: hasReachedStatus(order.delivery_status, 'out_for_delivery') }">
-                Out for delivery
-              </span>
-              <span :class="{ complete: order.delivery_status === 'delivered' }">Delivered</span>
+              <span
+                v-for="(step, index) in deliveryProgressSteps"
+                :key="step"
+                :aria-current="deliveryProgressIndex(order) === index ? 'step' : null"
+                :class="{
+                  complete: isDeliveryStepComplete(order, index),
+                  current: deliveryProgressIndex(order) === index && order.delivery_status !== 'delivered',
+                }"
+              >{{ step }}</span>
             </div>
           </div>
           <div v-if="order.delivery_timeline?.length" class="timeline">
@@ -132,6 +154,8 @@ const error = ref('');
 const notifications = ref([]);
 const mapOpen = ref({});
 let refreshTimer;
+const deliveryProgressSteps = ['Rider assigned', 'Picked up', 'On the way', 'Delivered'];
+const deliveryUpdates = computed(() => notifications.value.filter((item) => item.kind !== 'delivery_otp'));
 const activeDeliveries = computed(() =>
   orders.value.filter((order) => ['picked_up', 'out_for_delivery'].includes(order.delivery_status))
 );
@@ -165,12 +189,50 @@ const openDeliveryMap = (order) => {
 };
 
 const isTrackable = (order) =>
-  ['rider_assigned', 'accepted_by_rider', 'picked_up', 'out_for_delivery', 'delivery_failed', 'rescheduled'].includes(order.delivery_status);
+  ['rider_assigned', 'accepted_by_rider', 'picked_up', 'out_for_delivery'].includes(order.delivery_status);
 
-const hasReachedStatus = (status, target) => {
-  const order = ['pending', 'ready_for_delivery', 'rider_assigned', 'accepted_by_rider', 'picked_up', 'out_for_delivery', 'delivered'];
-  return order.indexOf(status) >= order.indexOf(target);
+const hasDeliveryProgress = (order) =>
+  deliveryProgressIndex(order) >= 0;
+
+const deliveryProgressIndex = (order) => ({
+  rider_assigned: 0,
+  accepted_by_rider: 0,
+  picked_up: 1,
+  out_for_delivery: 2,
+  delivery_failed: 2,
+  rescheduled: 2,
+  delivered: 3,
+}[order.delivery_status] ?? -1);
+
+const isDeliveryStepComplete = (order, index) =>
+  order.delivery_status === 'delivered' || deliveryProgressIndex(order) > index;
+
+const deliveryGuidance = (order) => ({
+  pending: 'Your order is awaiting confirmation from the store.',
+  ready_for_delivery: 'The store is preparing your order and will assign a rider next.',
+  rider_assigned: 'A rider has been assigned and is preparing to pick up your order.',
+  accepted_by_rider: 'The rider accepted the delivery and will pick up your order from the store.',
+  picked_up: 'The rider has your order. Delivery will begin shortly.',
+  out_for_delivery: order.payment_method === 'cod'
+    ? 'Your order is on the way. Keep your phone nearby and prepare the COD amount shown in your order.'
+    : 'Your order is on the way. Keep your phone nearby so the rider can reach you.',
+  delivery_failed: 'The delivery attempt was unsuccessful. The store or rider will update you about the next attempt.',
+  rescheduled: 'Your delivery is being rescheduled. Check back here for the next update.',
+  delivered: 'Your order has been delivered. Review the delivery timeline below for handover details.',
+  return_to_warehouse: 'Your order is returning to the store. Contact the store for help with next steps.',
+  cancelled: 'This order was cancelled.',
+}[order.delivery_status] || 'Check the delivery status and timeline below for the latest update.');
+
+const deliveryCodeNotification = (order) => {
+  if (!order.shipment?.id) return null;
+  return notifications.value.find((notification) =>
+    notification.kind === 'delivery_otp' &&
+    String(notification.shipment_id) === String(order.shipment.id)
+  ) || null;
 };
+
+const deliveryCode = (notification) =>
+  notification.message.match(/\b\d{6}\b/)?.[0] || '';
 
 const trackingMessage = (order) => {
   if (order.delivery_location && !isLocationStale(order.delivery_location)) {
@@ -257,9 +319,73 @@ onBeforeUnmount(leaveOrdersPage);
 }
 
 .delivery-notifications button {
+  min-height: 44px;
+  padding: .35rem .55rem;
   border: 0;
+  border-radius: 8px;
   background: transparent;
   color: #a72355;
+  font-weight: 700;
+}
+
+.delivery-guidance {
+  margin: .75rem 0;
+  padding: .8rem .9rem;
+  border-left: 4px solid #ff4d8d;
+  border-radius: 0 12px 12px 0;
+  background: #fff7fa;
+}
+
+.delivery-guidance strong {
+  color: #54263b;
+}
+
+.delivery-guidance p {
+  margin: .25rem 0 0;
+  color: #5c5c5c;
+  font-size: .88rem;
+  line-height: 1.45;
+}
+
+.delivery-code-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  margin: .75rem 0;
+  padding: .85rem;
+  border: 1px solid #f1c8d9;
+  border-radius: 14px;
+  background: #fff2f7;
+}
+
+.delivery-code-card p {
+  margin: .25rem 0 .45rem;
+  color: #675962;
+  font-size: .82rem;
+  line-height: 1.4;
+}
+
+.delivery-code-card code {
+  display: inline-block;
+  padding: .3rem .6rem;
+  border-radius: 8px;
+  background: white;
+  color: #a72355;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: .16em;
+}
+
+.delivery-code-card button {
+  min-height: 44px;
+  flex: 0 0 auto;
+  padding: .5rem .7rem;
+  border: 0;
+  border-radius: 8px;
+  background: #a72355;
+  color: white;
+  font: inherit;
   font-weight: 700;
 }
 
@@ -411,6 +537,11 @@ h1 {
   font-weight: 700;
 }
 
+.tracking-steps span.current {
+  border-color: #ff4d8d;
+  color: #a72355;
+  font-weight: 800;
+}
 
 .timeline {
   display: grid;
@@ -527,8 +658,14 @@ h1 {
     flex-direction: column;
   }
 
+  .delivery-code-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .delivery-notifications button,
-  .tracking-link {
+  .tracking-link,
+  .delivery-code-card button {
     min-height: 44px;
     display: inline-flex;
     align-items: center;

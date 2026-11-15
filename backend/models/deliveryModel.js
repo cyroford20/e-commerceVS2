@@ -42,6 +42,25 @@ const notify = async (client, shipmentId, userId, kind, message) => {
   );
 };
 
+const ensureHandoverCodeNotification = async (client, shipment) => {
+  const notification = await client.query(
+    `SELECT 1 FROM delivery_notifications
+     WHERE shipment_id = $1 AND recipient_user_id = $2 AND kind = 'delivery_otp'
+     LIMIT 1`,
+    [shipment.id, shipment.user_id]
+  );
+  const codeIsValid = shipment.otp_hash && shipment.otp_expires_at &&
+    new Date(shipment.otp_expires_at) > new Date();
+  if (codeIsValid && notification.rowCount) return;
+
+  const otp = makeOtp();
+  await client.query(`UPDATE shipments SET otp_hash = $1,
+    otp_expires_at = CURRENT_TIMESTAMP + INTERVAL '48 hours' WHERE id = $2`,
+  [hashOtp(otp), shipment.id]);
+  await notify(client, shipment.id, shipment.user_id, 'delivery_otp',
+    `Your delivery verification code is ${otp}. Share it with the rider only at handover.`);
+};
+
 const getZones = async (activeOnly = true) => {
   const result = await pool.query(
     `SELECT id, name, city, barangay, province, region, psgc_code, delivery_fee, active
@@ -388,14 +407,7 @@ const assignRider = async (shipmentId, riderId, assignedBy) =>
     await addEvent(client, shipmentId, assignedBy, 'rider_assigned', 'Rider assigned to shipment');
     await notify(client, shipmentId, riderId, 'assignment', `Shipment ${shipment.shipment_code} was assigned to you.`);
     await notify(client, shipmentId, shipment.user_id, 'status', `A rider was assigned to shipment ${shipment.shipment_code}.`);
-    if (!shipment.otp_hash || !shipment.otp_expires_at || new Date(shipment.otp_expires_at) <= new Date()) {
-      const otp = makeOtp();
-      await client.query(`UPDATE shipments SET otp_hash = $1,
-        otp_expires_at = CURRENT_TIMESTAMP + INTERVAL '48 hours' WHERE id = $2`,
-      [hashOtp(otp), shipmentId]);
-      await notify(client, shipmentId, shipment.user_id, 'delivery_otp',
-        `Your delivery verification code is ${otp}. Share it with the rider only at handover.`);
-    }
+    await ensureHandoverCodeNotification(client, shipment);
     return { id: shipmentId, rider_user_id: riderId, status: 'rider_assigned' };
   });
 
@@ -442,14 +454,7 @@ const autoAssignRider = async (shipmentId, assignedBy) =>
     await addEvent(client, shipmentId, assignedBy, 'rider_assigned', 'Automatically assigned to the least-loaded available rider');
     await notify(client, shipmentId, riderId, 'assignment', `A new shipment was assigned to you.`);
     await notify(client, shipmentId, shipment.user_id, 'status', 'A rider was assigned to your delivery.');
-    if (!shipment.otp_hash || !shipment.otp_expires_at || new Date(shipment.otp_expires_at) <= new Date()) {
-      const otp = makeOtp();
-      await client.query(`UPDATE shipments SET otp_hash = $1,
-        otp_expires_at = CURRENT_TIMESTAMP + INTERVAL '48 hours' WHERE id = $2`,
-      [hashOtp(otp), shipmentId]);
-      await notify(client, shipmentId, shipment.user_id, 'delivery_otp',
-        `Your delivery verification code is ${otp}. Share it with the rider only at handover.`);
-    }
+    await ensureHandoverCodeNotification(client, shipment);
     return { id: shipmentId, rider_user_id: riderId, status: 'rider_assigned' };
   });
 
@@ -515,6 +520,7 @@ const acceptShipment = async (shipmentId, riderId) => inTransaction(async (clien
   await client.query(`UPDATE rider_assignments SET state = 'accepted', accepted_at = CURRENT_TIMESTAMP
     WHERE shipment_id = $1 AND rider_user_id = $2 AND state = 'assigned'`, [shipmentId, riderId]);
   await client.query(`UPDATE rider_profiles SET availability = 'busy', updated_at = CURRENT_TIMESTAMP WHERE user_id = $1`, [riderId]);
+  await ensureHandoverCodeNotification(client, shipment);
   await addEvent(client, shipmentId, riderId, 'accepted_by_rider', 'Rider accepted delivery assignment');
   await notify(client, shipmentId, shipment.user_id, 'status', 'Your rider accepted the delivery assignment.');
   return { ...shipment, status: 'accepted_by_rider' };
@@ -643,15 +649,14 @@ const createShipmentForOrder = async (client, order, zoneId, deliveryFee, paymen
   );
   const shipment = created.rows[0];
   await addEvent(client, shipment.id, order.user_id, 'ready_for_delivery', 'Shipment created from online order');
-  if (paymentMethod === 'cod') {
-    await notify(client, shipment.id, order.user_id, 'delivery_otp', `Your delivery verification code is ${otp}. Share it with the rider only when your order arrives.`);
-  }
-  return { ...shipment, delivery_otp: paymentMethod === 'cod' ? otp : null };
+  await notify(client, shipment.id, order.user_id, 'delivery_otp',
+    `Your delivery verification code is ${otp}. Share it with the rider only at handover.`);
+  return { ...shipment, delivery_otp: otp };
 };
 
 const listNotifications = async (userId) => {
   const result = await pool.query(`SELECT id, shipment_id, kind, message, read_at, created_at
-    FROM delivery_notifications WHERE recipient_user_id = $1 ORDER BY created_at DESC LIMIT 100`, [userId]);
+    FROM delivery_notifications WHERE recipient_user_id = $1 ORDER BY created_at DESC, id DESC LIMIT 100`, [userId]);
   return result.rows;
 };
 

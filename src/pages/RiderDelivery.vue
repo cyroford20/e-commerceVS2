@@ -11,7 +11,7 @@
 
         <p v-if="error" class="notice error">{{ error }}</p>
         <p v-if="message" class="notice success">{{ message }}</p>
-        <section v-if="notifications.length" class="notifications">
+        <section v-if="unreadNotifications.length" class="notifications">
           <strong>Updates</strong>
           <button v-for="notification in unreadNotifications" :key="notification.id" @click="readNotification(notification)">
             {{ notification.message }}
@@ -30,6 +30,29 @@
               </div>
               <button class="refresh" :disabled="savingId === shipment.id" @click="refreshShipments">Refresh</button>
             </header>
+
+            <ol
+              v-if="shipment.is_current_assignment && riderProgressIndex(shipment) >= 0"
+              class="delivery-progress"
+              aria-label="Delivery progress"
+            >
+              <li
+                v-for="(step, index) in riderProgressSteps"
+                :key="step"
+                :aria-current="riderProgressIndex(shipment) === index && shipment.status !== 'delivered' ? 'step' : null"
+                :class="{
+                  complete: isRiderStepComplete(shipment, index),
+                  current: riderProgressIndex(shipment) === index && shipment.status !== 'delivered',
+                }"
+              >
+                {{ step }}
+              </li>
+            </ol>
+            <section v-if="shipment.is_current_assignment" class="next-step">
+              <span class="step-kicker">Next step</span>
+              <strong>{{ nextStepTitle(shipment) }}</strong>
+              <p>{{ nextStepInstructions(shipment) }}</p>
+            </section>
 
             <div class="address-block">
               <strong>Deliver to</strong>
@@ -57,12 +80,12 @@
             </div>
 
             <div class="workflow-actions" v-if="shipment.is_current_assignment && !['delivered', 'cancelled', 'return_to_warehouse', 'rescheduled'].includes(shipment.status)">
-              <button v-if="shipment.status === 'rider_assigned'" class="primary" :disabled="savingId === shipment.id" @click="accept(shipment)">Accept assignment</button>
+              <button v-if="shipment.status === 'rider_assigned'" class="primary" :disabled="savingId === shipment.id" @click="accept(shipment)">Accept delivery</button>
               <button v-if="shipment.status === 'accepted_by_rider'" class="primary" :disabled="savingId === shipment.id" @click="setStatus(shipment, 'picked_up')">Mark picked up</button>
               <button v-if="shipment.status === 'picked_up'" class="primary" :disabled="savingId === shipment.id" @click="setStatus(shipment, 'out_for_delivery')">Start delivery</button>
               <template v-if="shipment.status === 'out_for_delivery'">
-                <button class="primary" @click="openProof(shipment)">Confirm delivery</button>
-                <button class="secondary" @click="openFailure(shipment)">Report unsuccessful</button>
+                <button class="primary" :disabled="savingId === shipment.id" @click="openProof(shipment)">Complete handover</button>
+                <button class="secondary" :disabled="savingId === shipment.id" @click="openFailure(shipment)">Report a problem</button>
               </template>
               <template v-if="shipment.status === 'delivery_failed'">
                 <label>Reschedule for <input v-model="rescheduleAt[shipment.id]" type="datetime-local" /></label>
@@ -70,15 +93,39 @@
                 <button class="secondary" @click="setStatus(shipment, 'return_to_warehouse')">Return to warehouse</button>
               </template>
             </div>
+            <label v-if="shipment.status === 'out_for_delivery' && shipment.is_current_assignment" class="location-consent">
+              <input v-model="locationConsent" type="checkbox" @change="syncLocationSharing" />
+              {{ backgroundLocationSupported
+                ? 'Share my location with the customer and dispatcher, even when this app is in the background. This uses battery; Android shows an ongoing notification and iOS may show a location indicator.'
+                : 'Share my location with the customer and dispatcher while this page is open.' }}
+              Turn this off to stop sharing.
+            </label>
+            <p v-if="locationMessage && shipment.status === 'out_for_delivery' && shipment.is_current_assignment"
+              class="location-message" role="status" aria-live="polite">
+              {{ locationMessage }}
+            </p>
 
             <form v-if="proofShipmentId === shipment.id" class="action-form" @submit.prevent="submitProof(shipment)">
-              <h3>Verify delivery</h3>
-              <label>Customer delivery code<input v-model="proof.otp" required inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6-digit code" /></label>
-              <label>Recipient name<input v-model="proof.recipient_name" required maxlength="100" placeholder="Name of person receiving the order" /></label>
-              <label v-if="shipment.payment_method === 'cod'">Cash collected (PHP)<input v-model="proof.actual_cod" required type="number" min="0" step="0.01" /></label>
+              <h3>Complete customer handover</h3>
+              <p class="form-instructions">Ask the customer for the 6-digit code after handing over the order. For COD, collect payment before confirming.</p>
+              <label>Customer delivery code<input v-model="proof.otp" required type="text" inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code" maxlength="6" placeholder="Enter 6-digit code" /></label>
+              <label>Recipient name<input v-model="proof.recipient_name" required minlength="2" maxlength="100" autocomplete="name" placeholder="Name of person receiving the order" /></label>
+              <label v-if="shipment.payment_method === 'cod'">
+                Cash received from customer (PHP)
+                <input v-model="proof.actual_cod" required type="number" min="0" step="0.01" inputmode="decimal" />
+                <small>Expected COD: PHP {{ money(shipment.expected_cod) }}</small>
+              </label>
+              <p v-if="shipment.payment_method === 'cod' && codCollectionDiffers(shipment)" class="cod-warning" role="status">
+                Collected amount differs from expected COD. This difference will be recorded for store reconciliation.
+              </p>
               <label>Proof photo (optional)<input type="file" accept="image/jpeg,image/png,image/webp" @change="proof.photo = $event.target.files?.[0] || null" /></label>
               <label class="confirm"><input v-model="proof.confirmed" type="checkbox" /> I handed the order to the named recipient.</label>
-              <div class="form-actions"><button class="primary" :disabled="savingId === shipment.id">{{ savingId === shipment.id ? 'Saving…' : 'Complete delivery' }}</button><button type="button" class="secondary" @click="cancelForms">Cancel</button></div>
+              <div class="form-actions">
+                <button class="primary" :disabled="savingId === shipment.id || !canSubmitProof(shipment)">
+                  {{ savingId === shipment.id ? 'Saving…' : 'Confirm handover' }}
+                </button>
+                <button type="button" class="secondary" :disabled="savingId === shipment.id" @click="cancelForms">Cancel</button>
+              </div>
             </form>
 
             <form v-if="failureShipmentId === shipment.id" class="action-form" @submit.prevent="reportFailure(shipment)">
@@ -105,16 +152,6 @@
           <article><strong>{{ shipments.filter((s) => s.status === 'delivery_failed').length }}</strong><span>Failed</span></article>
         </section>
 
-        <label v-if="hasActiveDelivery" class="location-consent">
-          <input v-model="locationConsent" type="checkbox" @change="syncLocationSharing" />
-          {{ backgroundLocationSupported
-            ? 'Share my location with the customer and dispatcher, even when this app is in the background. This uses battery; Android shows an ongoing notification and iOS may show a location indicator.'
-            : 'Share my location with the customer and dispatcher while this page is open.' }}
-          Turn this off to stop sharing.
-        </label>
-        <p v-if="locationMessage" class="location-message" role="status" aria-live="polite">
-          {{ locationMessage }}
-        </p>
       </main>
     </ion-content>
   </ion-page>
@@ -151,8 +188,8 @@ const mapOpen = reactive({});
 let refreshTimer;
 let riderPageActive = false;
 const unreadNotifications = computed(() => notifications.value.filter((item) => !item.read_at));
-const hasActiveDelivery = computed(() => shipments.value.some((item) => item.status === 'out_for_delivery'));
 const backgroundLocationSupported = Capacitor.isNativePlatform();
+const riderProgressSteps = ['Assignment', 'Picked up', 'On the way', 'Delivered'];
 
 const label = (value = '') => String(value || 'unknown').split('_').map((part) => part[0]?.toUpperCase() + part.slice(1)).join(' ');
 const money = (value) => Number(value || 0).toFixed(2);
@@ -160,6 +197,46 @@ const dateTime = (date) => new Date(date).toLocaleString('en-PH', { dateStyle: '
 const isLocationStale = (date) => Date.now() - new Date(date).getTime() > 120000;
 const navigationUrl = (address) =>
   `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
+const riderProgressIndex = (shipment) => ({
+  rider_assigned: 0,
+  accepted_by_rider: 0,
+  picked_up: 1,
+  out_for_delivery: 2,
+  delivery_failed: 2,
+  delivered: 3,
+}[shipment.status] ?? -1);
+const isRiderStepComplete = (shipment, index) =>
+  shipment.status === 'delivered' || riderProgressIndex(shipment) > index;
+const nextStepTitle = (shipment) => ({
+  rider_assigned: 'Accept this delivery',
+  accepted_by_rider: 'Pick up the order',
+  picked_up: 'Start the delivery route',
+  out_for_delivery: 'Hand over the order and confirm delivery',
+  delivery_failed: 'Resolve the failed delivery attempt',
+  rescheduled: 'Waiting for a new rider assignment',
+  return_to_warehouse: 'Shipment returned to the store',
+  delivered: 'Delivery completed',
+  cancelled: 'Delivery cancelled',
+}[shipment.status] || 'Check the shipment status');
+const nextStepInstructions = (shipment) => ({
+  rider_assigned: 'Review the address, phone number, and COD amount, then accept the assignment.',
+  accepted_by_rider: 'Collect the items from the store and mark them picked up only when they are with you.',
+  picked_up: 'Confirm the delivery address and start sharing your location before heading out.',
+  out_for_delivery: 'Contact the customer before arrival. At handover, ask for the code and collect the COD amount shown.',
+  delivery_failed: 'Record why delivery failed, then choose a future reschedule time or return the parcel.',
+  rescheduled: 'Dispatch must assign a rider before this shipment can continue.',
+  return_to_warehouse: 'No further rider action is needed for this shipment.',
+  delivered: 'The customer handover and delivery code have been recorded.',
+  cancelled: 'No further rider action is needed for this shipment.',
+}[shipment.status] || 'Refresh the shipment if the status does not look current.');
+const canSubmitProof = (shipment) =>
+  /^\d{6}$/.test(proof.otp.trim()) &&
+  proof.recipient_name.trim().length >= 2 &&
+  proof.confirmed &&
+  (shipment.payment_method !== 'cod' ||
+    (proof.actual_cod !== '' && Number.isFinite(Number(proof.actual_cod)) && Number(proof.actual_cod) >= 0));
+const codCollectionDiffers = (shipment) =>
+  proof.actual_cod !== '' && Math.round(Number(proof.actual_cod) * 100) !== Math.round(Number(shipment.expected_cod || 0) * 100);
 const loadProofPhotos = async () => Promise.all(shipments.value
   .filter((shipment) => shipment.photo_filename && !shipment.proof_photo_url)
   .map(async (shipment) => {
@@ -238,12 +315,12 @@ const accept = async (shipment) => {
 const setStatus = (shipment, status) => runStatus(shipment, { status });
 const openProof = (shipment) => {
   cancelForms(); proofShipmentId.value = shipment.id;
-  proof.otp = ''; proof.recipient_name = ''; proof.actual_cod = shipment.payment_method === 'cod' ? String(shipment.expected_cod) : '';
+  proof.otp = ''; proof.recipient_name = ''; proof.actual_cod = shipment.payment_method === 'cod' ? String(shipment.expected_cod ?? 0) : '';
   proof.confirmed = false; proof.photo = null;
 };
 const cancelForms = () => { proofShipmentId.value = null; failureShipmentId.value = null; failure.reason = ''; failure.note = ''; };
 const submitProof = async (shipment) => {
-  if (!proof.confirmed || proof.otp.trim().length !== 6 || proof.recipient_name.trim().length < 2) {
+  if (!canSubmitProof(shipment)) {
     error.value = 'Enter the 6-digit customer code, recipient name, and confirm the handover.'; return;
   }
   await runStatus(shipment, {
@@ -312,6 +389,14 @@ onBeforeUnmount(() => {
 .shipment-card { display: grid; gap: .85rem; padding: 1rem; border: 1px solid #f1dce5; border-radius: 18px; background: #fff; box-shadow: 0 10px 28px rgba(50,20,35,.06); }
 .shipment-head { display: flex; justify-content: space-between; gap: 1rem; }.shipment-head h2 { font-size: 1.15rem; margin: .5rem 0 .25rem; }.shipment-head p { margin: 0; color: #675962; font-size: .88rem; }
 .shipment-code { margin-right: .5rem; color: #a72355; font-weight: 800; }.status-pill { display: inline-block; padding: .25rem .55rem; border-radius: 20px; background: #fff1f6; color: #92234e; font-size: .75rem; font-weight: 700; }
+.delivery-progress { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: .3rem; padding: 0; margin: 0; list-style: none; }
+.delivery-progress li { min-width: 0; padding-top: .5rem; border-top: 3px solid #eadfe5; color: #81747a; font-size: .72rem; text-align: center; overflow-wrap: anywhere; }
+.delivery-progress li.complete { border-color: #34a36b; color: #26734d; font-weight: 700; }
+.delivery-progress li.current { border-color: #ff4d8d; color: #a72355; font-weight: 800; }
+.next-step { display: grid; gap: .25rem; padding: .8rem; border-left: 4px solid #ff4d8d; border-radius: 0 12px 12px 0; background: #fff4f8; }
+.next-step strong { color: #54263b; }
+.next-step p,.form-instructions { margin: 0; color: #675962; font-size: .88rem; line-height: 1.45; }
+.step-kicker { color: #a72355; font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 .refresh,.primary,.secondary { min-height: 44px; border: 0; border-radius: 10px; padding: .72rem .9rem; font: inherit; font-weight: 700; cursor: pointer; }.refresh,.secondary { background: #211a1e; color: white; }.primary { background: #ff4d8d; color: white; }.primary:disabled { opacity: .55; }
 .address-block { display: grid; gap: .3rem; padding: .75rem; border-radius: 12px; background: #fbf7f9; }.address-block a { color: #a72355; }.address-block small { color: #75666e; }
 .workflow-actions,.form-actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }.workflow-actions label { display: flex; align-items: center; gap: .35rem; }
@@ -323,6 +408,8 @@ onBeforeUnmount(() => {
 .action-form label { min-width: 0; }
 .action-form input[type=file] { max-width: 100%; }
 .history summary { min-height: 44px; display: flex; align-items: center; }
+.action-form small { color: #75666e; font-weight: 400; }
+.cod-warning { margin: 0; padding: .65rem; border-radius: 9px; background: #fff0dc; color: #815000; font-size: .83rem; }
 @media(max-width:600px) {
   .rider-shell { padding-inline: .8rem; }
   .shipment-head { display: grid; min-width: 0; }
@@ -335,5 +422,6 @@ onBeforeUnmount(() => {
   .action-form textarea { min-height: 88px; }
   .action-form input[type=checkbox] { width: 20px; min-height: 20px; }
   .location-consent { align-items: flex-start; line-height: 1.4; }
+  .delivery-progress li { font-size: .66rem; line-height: 1.2; }
 }
 </style>
