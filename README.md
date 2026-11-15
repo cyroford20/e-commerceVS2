@@ -57,7 +57,7 @@ The shipment workflow is Ready for delivery → Rider assigned → Accepted by r
 
 ## Barcode and location permissions
 
-The scanner requests the rear camera through the in-app WebView, displays its live feed in the scan frame, and decodes barcodes locally with the ZXing WebAssembly detector. It does not launch Google Lens, Google Code Scanner, or another app. Camera permission is required. Riders separately opt in to GPS sharing while delivering. Android and iOS declare the required camera and location permissions.
+On Android, scanning uses the native ML Kit Google Code Scanner. The scanner module is declared for installation with Google Play services; if it is not ready on the first attempt, wait for setup and scan again. The native scanner does not require the app's camera permission. On iOS and the web, the app requests the rear camera in a secure context, shows a preview, and decodes locally with the ZXing WebAssembly detector. Camera permission is required for those paths. Riders separately opt in to GPS sharing while delivering. Android and iOS declare the required camera and location permissions.
 
 After changing native dependencies or permissions, sync and build the mobile project:
 

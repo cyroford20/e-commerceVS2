@@ -4,21 +4,28 @@
       {{ scanning ? 'Scanning...' : label }}
     </button>
 
-    <div v-if="scanning" class="barcode-scanner-overlay">
+    <div
+      v-if="scanning && !nativeScanning"
+      class="barcode-scanner-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="scanner-title"
+      aria-describedby="scanner-description"
+    >
       <div class="scanner-card">
         <div class="scanner-camera-window">
-          <video ref="videoElement" class="scanner-video" autoplay muted playsinline></video>
+          <video ref="videoElement" class="scanner-video" autoplay muted playsinline aria-hidden="true"></video>
           <div class="scanner-frame" aria-hidden="true"></div>
-          <span v-if="!cameraReady" class="scanner-loading">Starting camera...</span>
+          <span v-if="!cameraReady" class="scanner-loading" role="status">Starting camera...</span>
         </div>
-        <h2>Scan barcode</h2>
-        <p>Camera access is used only to scan a product barcode. Point the rear camera at the barcode.</p>
+        <h2 id="scanner-title">Scan barcode</h2>
+        <p id="scanner-description">Camera access is used only to scan a product barcode. Point the rear camera at the barcode.</p>
         <button type="button" class="scanner-cancel" @click="stopScanner">Cancel</button>
       </div>
     </div>
 
     <Teleport to="body">
-      <p v-if="errorMessage" class="scanner-error">{{ errorMessage }}</p>
+      <p v-if="errorMessage" class="scanner-error" role="alert">{{ errorMessage }}</p>
     </Teleport>
   </div>
 </template>
@@ -26,6 +33,8 @@
 <script setup>
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import { Capacitor } from '@capacitor/core';
+import { BarcodeFormat, BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 import {
   BarcodeDetector as BarcodeDetectorPonyfill,
   prepareZXingModule,
@@ -40,6 +49,7 @@ defineProps({
 const emit = defineEmits(['scanned']);
 const route = useRoute();
 const scanning = ref(false);
+const nativeScanning = ref(false);
 const cameraReady = ref(false);
 const errorMessage = ref('');
 const videoElement = ref(null);
@@ -50,6 +60,13 @@ let detectionTimer;
 let decoderReady;
 
 const barcodeFormats = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'];
+const nativeBarcodeFormats = [
+  BarcodeFormat.Ean13,
+  BarcodeFormat.Ean8,
+  BarcodeFormat.UpcA,
+  BarcodeFormat.UpcE,
+  BarcodeFormat.Code128,
+];
 
 const prepareDecoder = () => {
   decoderReady ??= prepareZXingModule({
@@ -74,6 +91,7 @@ const cleanup = () => {
     videoElement.value.srcObject = null;
   }
   cameraReady.value = false;
+  nativeScanning.value = false;
   scanning.value = false;
 };
 
@@ -149,6 +167,39 @@ const startScanner = async () => {
   scanning.value = true;
   const session = ++scannerSession;
 
+  if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+    nativeScanning.value = true;
+    try {
+      const { supported } = await BarcodeScanner.isSupported();
+      if (!supported) throw new Error('No supported camera was found on this device.');
+
+      const { available } = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
+      if (!available) {
+        await BarcodeScanner.installGoogleBarcodeScannerModule();
+        throw new Error('Google Barcode Scanner is installing. Wait for setup to finish, then scan again.');
+      }
+
+      const { barcodes } = await BarcodeScanner.scan({
+        formats: nativeBarcodeFormats,
+        autoZoom: true,
+      });
+      if (session !== scannerSession) return;
+
+      const value = barcodes.find((barcode) => barcode.rawValue?.trim())?.rawValue?.trim();
+      if (value) {
+        finishScan(value);
+      } else {
+        cleanup();
+        errorMessage.value = 'Scan canceled or no barcode detected. Try scanning again.';
+      }
+    } catch (error) {
+      const stillActive = session === scannerSession;
+      cleanup();
+      if (stillActive) errorMessage.value = formatCameraError(error);
+    }
+    return;
+  }
+
   try {
     if (!navigator.mediaDevices?.getUserMedia) {
       throw new Error('Live camera access is unavailable. Install and open the mobile app, then try again.');
@@ -215,6 +266,7 @@ watch(() => route.fullPath, () => {
 
 .scanner-button,
 .scanner-cancel {
+  min-height: 44px;
   border: 1px solid #e8c8d8;
   border-radius: 999px;
   padding: 0.65rem 0.9rem;
@@ -265,6 +317,7 @@ watch(() => route.fullPath, () => {
   display: grid;
   justify-items: center;
   gap: 0.65rem;
+  box-sizing: border-box;
   width: min(90vw, 360px);
   padding: 1.5rem;
   border-radius: 20px;
@@ -274,7 +327,7 @@ watch(() => route.fullPath, () => {
 
 .scanner-camera-window {
   position: relative;
-  width: min(76vw, 400px);
+  width: min(100%, 400px);
   height: min(54vw, 250px);
   overflow: hidden;
   border-radius: 14px;

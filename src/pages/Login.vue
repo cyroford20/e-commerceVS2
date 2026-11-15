@@ -20,27 +20,44 @@
           <h1>Sign in</h1>
           <p class="subtitle">Pick up where you left your cart.</p>
 
-          <div class="field-stack">
-            <label>
-              Email
-              <ion-input type="email" v-model="email" placeholder="you@example.com" fill="outline"></ion-input>
-            </label>
-            <label>
-              Password
-              <ion-input type="password" v-model="password" placeholder="Your password" fill="outline"></ion-input>
-            </label>
-          </div>
+          <form class="auth-form" @submit.prevent="handleLogin">
+            <div class="field-stack">
+              <label>
+                Email
+                <ion-input
+                  type="email"
+                  v-model="email"
+                  placeholder="you@example.com"
+                  fill="outline"
+                  autocomplete="email"
+                  inputmode="email"
+                  autocapitalize="off"
+                  autocorrect="off"
+                ></ion-input>
+              </label>
+              <label>
+                Password
+                <ion-input
+                  type="password"
+                  v-model="password"
+                  placeholder="Your password"
+                  fill="outline"
+                  autocomplete="current-password"
+                ></ion-input>
+              </label>
+            </div>
 
-          <ion-button expand="block" :disabled="loading" @click="handleLogin">
-            {{ loading ? 'Signing in...' : 'Login' }}
-          </ion-button>
+            <ion-button type="submit" expand="block" :disabled="loading">
+              {{ loading ? 'Signing in...' : 'Login' }}
+            </ion-button>
+          </form>
 
           <p class="switch-link">
             Don't have an account?
             <router-link to="/register">Register</router-link>
           </p>
 
-          <p class="error-msg" v-if="error">{{ error }}</p>
+          <p class="error-msg" v-if="error" role="alert">{{ error }}</p>
         </div>
       </div>
     </ion-content>
@@ -189,6 +206,11 @@ h1 {
   margin-bottom: 1.3rem;
 }
 
+.auth-form {
+  display: flex;
+  flex-direction: column;
+}
+
 label {
   display: flex;
   flex-direction: column;
@@ -235,12 +257,22 @@ ion-button {
     grid-template-columns: 1fr;
   }
 
+  .auth-panel {
+    min-width: 0;
+  }
+
   .auth-visual {
     min-height: 30vh;
   }
 
   .auth-panel {
     padding: 2rem 1.25rem 3rem;
+  }
+}
+
+@media (max-width: 600px) {
+  ion-input {
+    font-size: 16px;
   }
 }
 </style>

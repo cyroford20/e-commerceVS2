@@ -20,31 +20,54 @@
           <h1>Create account</h1>
           <p class="subtitle">Register as a customer to browse, check out, and track your orders.</p>
 
-          <div class="field-stack">
-            <label>
-              Full name
-              <ion-input type="text" v-model="name" placeholder="Juan Dela Cruz" fill="outline"></ion-input>
-            </label>
-            <label>
-              Email
-              <ion-input type="email" v-model="email" placeholder="you@example.com" fill="outline"></ion-input>
-            </label>
-            <label>
-              Password
-              <ion-input type="password" v-model="password" placeholder="Min. 6 characters" fill="outline"></ion-input>
-            </label>
-          </div>
+          <form class="auth-form" @submit.prevent="handleRegister">
+            <div class="field-stack">
+              <label>
+                Full name
+                <ion-input
+                  type="text"
+                  v-model="name"
+                  placeholder="Juan Dela Cruz"
+                  fill="outline"
+                  autocomplete="name"
+                ></ion-input>
+              </label>
+              <label>
+                Email
+                <ion-input
+                  type="email"
+                  v-model="email"
+                  placeholder="you@example.com"
+                  fill="outline"
+                  autocomplete="email"
+                  inputmode="email"
+                  autocapitalize="off"
+                  autocorrect="off"
+                ></ion-input>
+              </label>
+              <label>
+                Password
+                <ion-input
+                  type="password"
+                  v-model="password"
+                  placeholder="Min. 6 characters"
+                  fill="outline"
+                  autocomplete="new-password"
+                ></ion-input>
+              </label>
+            </div>
 
-          <ion-button expand="block" :disabled="loading" @click="handleRegister">
-            {{ loading ? 'Creating account...' : 'Register' }}
-          </ion-button>
+            <ion-button type="submit" expand="block" :disabled="loading">
+              {{ loading ? 'Creating account...' : 'Register' }}
+            </ion-button>
+          </form>
 
           <p class="switch-link">
             Already have an account?
             <router-link to="/login">Login</router-link>
           </p>
 
-          <p class="error-msg" v-if="error">{{ error }}</p>
+          <p class="error-msg" v-if="error" role="alert">{{ error }}</p>
         </div>
       </div>
     </ion-content>
@@ -199,6 +222,11 @@ h1 {
   margin-bottom: 1.3rem;
 }
 
+.auth-form {
+  display: flex;
+  flex-direction: column;
+}
+
 label {
   display: flex;
   flex-direction: column;
@@ -245,12 +273,22 @@ ion-button {
     grid-template-columns: 1fr;
   }
 
+  .auth-panel {
+    min-width: 0;
+  }
+
   .auth-visual {
     min-height: 26vh;
   }
 
   .auth-panel {
     padding: 2rem 1.25rem 3rem;
+  }
+}
+
+@media (max-width: 600px) {
+  ion-input {
+    font-size: 16px;
   }
 }
 </style>

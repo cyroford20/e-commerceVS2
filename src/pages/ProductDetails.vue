@@ -314,4 +314,28 @@ h1 {
     padding: 1.8rem 1.25rem 2.6rem;
   }
 }
+
+@media (max-width: 480px) {
+  .detail-media {
+    min-height: 34vh;
+    padding: 0.9rem;
+  }
+
+  .media-frame {
+    width: min(100%, 360px);
+  }
+
+  .detail-copy {
+    padding: 1.4rem 1rem calc(2rem + env(safe-area-inset-bottom));
+  }
+
+  .qty-controls button,
+  .add-btn {
+    min-height: 44px;
+  }
+
+  .qty-controls button {
+    width: 44px;
+  }
+}
 </style>

@@ -311,9 +311,34 @@ ion-button {
     padding-inline: 0.8rem;
   }
 
+  .delivery-form input,
+  .delivery-form textarea,
+  .delivery-form select {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .delivery-form textarea {
+    min-height: 88px;
+  }
+
+  .total-row {
+    gap: 0.75rem;
+    font-size: 1.05rem;
+  }
+
+  .total-row > :last-child {
+    text-align: right;
+    white-space: nowrap;
+  }
+
   .checkout-container ion-button {
     min-height: 48px;
     margin-bottom: env(safe-area-inset-bottom);
+  }
+
+  .retry-zones {
+    min-height: 44px;
   }
 }
 

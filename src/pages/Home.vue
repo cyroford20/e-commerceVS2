@@ -612,4 +612,22 @@ onIonViewWillEnter(() => {
     gap: 1.15rem 0.75rem;
   }
 }
+
+@media (max-width: 360px) {
+  .product-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog {
+    padding-inline: 0.8rem;
+  }
+
+  .category-row {
+    gap: 0.4rem;
+  }
+
+  .chip {
+    min-height: 44px;
+  }
+}
 </style>

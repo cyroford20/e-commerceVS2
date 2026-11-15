@@ -69,8 +69,10 @@ h2 {
 }
 
 .qty-controls button {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
   border-radius: 50%;
   border: 1px solid #0a0a0a;
   background: #ffffff;
@@ -91,17 +93,24 @@ h2 {
 
 @media (max-width: 600px) {
   .cart-line {
-    grid-template-columns: 72px minmax(0, 1fr);
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 0.65rem;
+    padding: 0.7rem;
   }
 
   img {
-    width: 72px;
-    height: 72px;
+    width: 64px;
+    height: 64px;
   }
 
   .qty-controls {
     grid-column: 1 / -1;
-    justify-content: flex-end;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .qty-controls button.remove {
+    margin-left: auto;
   }
 }
 </style>

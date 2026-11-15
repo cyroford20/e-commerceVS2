@@ -393,7 +393,7 @@ h1 {
 
 .tracking-steps {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.35rem;
 }
 
@@ -515,6 +515,23 @@ h1 {
   .tracking-steps span {
     font-size: 0.66rem;
     line-height: 1.2;
+  }
+
+  .tracking-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 0.6rem;
+  }
+
+  .delivery-notifications article {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .delivery-notifications button,
+  .tracking-link {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
   }
 }
 </style>

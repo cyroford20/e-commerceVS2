@@ -394,7 +394,7 @@ onMounted(() => {
 .option-copy strong { overflow: hidden; font-size: .88rem; text-overflow: ellipsis; }
 .option-copy small { margin-top: .18rem; color: #777; font-size: .7rem; }
 .option-price { color: #d4146a; font-size: .84rem; font-weight: 800; white-space: nowrap; }
-.clear-option, .success-link { justify-self: start; padding: .45rem 0; border: 0; background: transparent; color: #a51052; font: inherit; font-size: .78rem; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.clear-option, .success-link { justify-self: start; min-height: 44px; padding: .45rem 0; border: 0; background: transparent; color: #a51052; font: inherit; font-size: .78rem; font-weight: 700; text-decoration: underline; cursor: pointer; }
 .build-summary { position: sticky; top: 1rem; }
 .live-preview { margin: -.2rem -.2rem 1.2rem; padding: 1rem; overflow: hidden; border-radius: 14px; background: radial-gradient(circle at 50% 0%, rgba(255, 77, 141, .25), transparent 48%), linear-gradient(145deg, #090909, #20101a); color: #fff; }
 .preview-heading { align-items: center; margin-bottom: .85rem; }

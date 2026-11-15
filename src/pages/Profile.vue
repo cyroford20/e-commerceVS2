@@ -288,7 +288,47 @@ input {
   gap: 0.65rem;
 }
 
+.hero-card > div:last-child {
+  min-width: 0;
+}
+
+.hero-card h1,
+.email {
+  overflow-wrap: anywhere;
+}
+
 ion-button[expand='block']:first-child {
   --background: #0a0a0a;
+}
+
+@media (max-width: 600px) {
+  .profile-wrap {
+    padding: 1rem 0.75rem calc(2rem + env(safe-area-inset-bottom));
+  }
+
+  .hero-card {
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .avatar {
+    width: 56px;
+    height: 56px;
+    flex: 0 0 56px;
+  }
+
+  input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .primary-btn,
+  .actions ion-button {
+    min-height: 44px;
+  }
+
+  .actions ion-button {
+    margin: 0;
+  }
 }
 </style>

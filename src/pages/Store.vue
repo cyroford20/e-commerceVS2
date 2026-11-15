@@ -1190,6 +1190,7 @@ onIonViewWillLeave(() => {
   display: grid;
   grid-template-columns: 270px minmax(0, 1fr);
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .sidebar {
@@ -2011,12 +2012,13 @@ onIonViewWillLeave(() => {
 
 .form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.85rem;
 }
 
 .form-grid label {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 0.35rem;
   font-size: 0.74rem;
@@ -2031,6 +2033,9 @@ onIonViewWillLeave(() => {
 }
 
 .form-grid input {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid #e8e8e8;
   border-radius: 14px;
   padding: 0.8rem 0.9rem;
@@ -2041,6 +2046,9 @@ onIonViewWillLeave(() => {
 
 .barcode-field {
   display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   gap: 0.45rem;
   align-items: stretch;
 }
@@ -2365,7 +2373,7 @@ onIonViewWillLeave(() => {
   .stats,
   .dash-grid,
   .form-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -2373,6 +2381,8 @@ onIonViewWillLeave(() => {
   .admin-shell {
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   .sidebar {
@@ -2422,7 +2432,7 @@ onIonViewWillLeave(() => {
   .side-nav button {
     flex: 0 0 auto;
     width: auto;
-    min-height: 42px;
+    min-height: 44px;
     white-space: nowrap;
     padding: 0.45rem 0.75rem;
     font-size: 0.78rem;
@@ -2447,7 +2457,21 @@ onIonViewWillLeave(() => {
   }
 
   .side-foot {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .admin-chip {
     display: none;
+  }
+
+  .logout-btn {
+    width: auto;
+    min-height: 44px;
+    justify-content: center;
+    padding: 0.45rem 0.85rem;
+    white-space: nowrap;
   }
 
   .admin-main {
@@ -2496,10 +2520,21 @@ onIonViewWillLeave(() => {
     width: 100%;
   }
 
+  .search-pill input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
   .primary-btn,
   .ghost-btn {
     min-height: 44px;
     justify-content: center;
+  }
+
+  .form-grid input,
+  .pos-customer select {
+    min-height: 44px;
+    font-size: 16px;
   }
 
   .hero-banner {
@@ -2518,7 +2553,7 @@ onIonViewWillLeave(() => {
   .stats,
   .dash-grid,
   .form-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .stat-card h3 {
@@ -2601,8 +2636,18 @@ onIonViewWillLeave(() => {
   }
 
   .pos-qty button {
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
+  }
+
+  .danger-link,
+  .row-actions button,
+  .barcode-field :deep(.scanner-button) {
+    min-height: 44px;
+  }
+
+  .danger-link {
+    padding: 0.35rem;
   }
 
   .pos-total strong {
@@ -2629,6 +2674,20 @@ onIonViewWillLeave(() => {
 
   .order-right {
     text-align: left;
+  }
+}
+
+@media (max-width: 360px) {
+  .pos-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .side-nav button {
+    padding-inline: 0.6rem;
+  }
+
+  .admin-main {
+    padding-inline: 0.6rem;
   }
 }
 </style>
