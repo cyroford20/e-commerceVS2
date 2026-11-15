@@ -25,7 +25,13 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Vape Shop uses the camera to scan product barcodes.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Vape Shop shares the rider's location with the customer and store during an active delivery.</string>
+	<string>Black Elite shares the rider's location with the customer and store during an active delivery.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Black Elite continues sharing the rider's location with the customer and store during an active delivery, even when the app is in the background.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

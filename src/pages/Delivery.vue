@@ -48,7 +48,7 @@
               </small>
             </div>
             <div v-if="mapOpen[order.id]" class="in-app-map">
-              <LiveDeliveryMap :location="order.delivery_location" :address="order.delivery_address || ''" />
+              <LiveDeliveryMap :location="order.delivery_location" />
             </div>
             <div class="actions">
               <span class="status">{{ formatStatus(order.delivery_status) }}</span>

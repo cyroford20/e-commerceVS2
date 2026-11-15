@@ -6,6 +6,12 @@
     "androidScheme": "https"
   },
   "android": {
+    "useLegacyBridge": true,
     "allowMixedContent": true
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
   }
 }

@@ -55,7 +55,7 @@
             </div>
           </div>
           <div v-if="isTrackable(order) || mapOpen[order.id]" :id="`delivery-map-${order.id}`">
-            <LiveDeliveryMap :location="order.delivery_location" :address="order.delivery_address" />
+            <LiveDeliveryMap :location="order.delivery_location" />
           </div>
           <div v-if="order.delivery_address" class="delivery-details">
             <strong>Delivery</strong>

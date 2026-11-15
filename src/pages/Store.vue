@@ -3180,17 +3180,14 @@ onIonViewWillLeave(() => {
   }
 
   .pos-ticket {
-    position: sticky;
-    bottom: 0.25rem;
-    top: auto;
-    z-index: 15;
+    position: static;
     width: 100%;
     min-height: 0;
-    max-height: 70vh;
+    max-height: none;
     margin-bottom: 0;
-    overflow: auto;
+    overflow: visible;
     border-radius: 18px;
-    box-shadow: 0 -10px 28px rgba(17, 17, 17, 0.12);
+    box-shadow: 0 8px 24px rgba(17, 17, 17, 0.08);
   }
 
   .pos-discount-controls input,

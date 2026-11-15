@@ -57,7 +57,9 @@ The shipment workflow is Ready for delivery → Rider assigned → Accepted by r
 
 ## Barcode and location permissions
 
-On Android, scanning uses the native ML Kit Google Code Scanner. The scanner module is declared for installation with Google Play services; if it is not ready on the first attempt, wait for setup and scan again. The native scanner does not require the app's camera permission. On iOS and the web, the app requests the rear camera in a secure context, shows a preview, and decodes locally with the ZXing WebAssembly detector. Camera permission is required for those paths. Riders separately opt in to GPS sharing while delivering. Android and iOS declare the required camera and location permissions.
+On Android, scanning uses the native ML Kit Google Code Scanner. The scanner module is declared for installation with Google Play services; if it is not ready on the first attempt, wait for setup and scan again. The native scanner does not require the app's camera permission. On iOS and the web, the app requests the rear camera in a secure context, shows a preview, and decodes locally with the ZXing WebAssembly detector. Camera permission is required for those paths.
+
+Riders explicitly opt in to location sharing during active deliveries. The native Android and iOS apps can continue sharing while backgrounded; Android displays an ongoing location notification, and iOS displays its location indicator. This uses battery, requires location permission, and may stop if the app is force-quit or the operating system terminates it. Web tracking works only while the page remains open. The in-app map shows the rider's last shared location and does not geocode or send the delivery address to a map service. The rider can explicitly open Google Maps navigation, which shares the address with Google Maps only after the rider taps that link.
 
 After changing native dependencies or permissions, sync and build the mobile project:
 
@@ -66,6 +68,7 @@ After changing native dependencies or permissions, sync and build the mobile pro
 ## Verification
 
     npm run build
+    npm test --prefix backend
     node --check backend/server.js
     node --check backend/controllers/productController.js
     node --check backend/controllers/orderController.js
@@ -74,4 +77,4 @@ After changing native dependencies or permissions, sync and build the mobile pro
     node --check backend/models/orderModel.js
     node --check backend/models/deliveryModel.js
 
-The repository currently has no automated test suite. Production builds and syntax checks do not replace testing against a configured PostgreSQL database or a physical device. Verify camera preview, permission prompts, GPS, uploads, and delivery workflows on supported devices before release.
+Backend unit tests cover coupon rules and role authorization, but do not cover the full rider-to-customer workflow. Production builds and tests do not replace testing against a configured PostgreSQL database or physical devices. Verify location permissions, background GPS, notifications, map links, uploads, and delivery workflows on supported devices before release.

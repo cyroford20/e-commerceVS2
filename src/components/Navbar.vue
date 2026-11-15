@@ -68,6 +68,7 @@ import {
   storefrontOutline,
 } from 'ionicons/icons';
 import { isLoggedIn, logout, getCartCount, getRole, homeForRole } from '../services/api';
+import { stopAllRiderLocationSharing } from '../services/riderLocationTracking';
 
 defineProps({
   title: { type: String, default: 'Vape Shop' },
@@ -90,10 +91,16 @@ const refresh = () => {
   brandHome.value = homeForRole(role);
 };
 
-const handleLogout = () => {
-  logout();
-  refresh();
-  router.push('/login');
+const handleLogout = async () => {
+  try {
+    await stopAllRiderLocationSharing();
+  } catch (error) {
+    console.error('Could not stop rider location sharing during logout.', error);
+  } finally {
+    logout();
+    refresh();
+    router.push('/login');
+  }
 };
 
 onMounted(refresh);

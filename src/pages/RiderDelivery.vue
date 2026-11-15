@@ -36,6 +36,15 @@
               <span>{{ shipment.delivery_address }}</span>
               <span v-if="shipment.delivery_instructions">Instructions: {{ shipment.delivery_instructions }}</span>
               <a :href="`tel:${shipment.delivery_phone}`">{{ shipment.delivery_phone }}</a>
+              <a
+                v-if="shipment.delivery_address"
+                class="secondary navigation-link"
+                :href="navigationUrl(shipment.delivery_address)"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open navigation (shares address with Google Maps when opened)
+              </a>
               <button v-if="shipment.delivery_address || shipment.latitude != null" type="button" class="secondary" @click="mapOpen[shipment.id] = !mapOpen[shipment.id]">
                 {{ mapOpen[shipment.id] ? 'Hide in-app map' : 'View in-app map' }}
               </button>
@@ -44,7 +53,6 @@
             <div v-if="mapOpen[shipment.id]" class="in-app-map">
               <LiveDeliveryMap
                 :location="shipment.latitude != null ? { latitude: shipment.latitude, longitude: shipment.longitude } : null"
-                :address="shipment.delivery_address || ''"
               />
             </div>
 
@@ -99,23 +107,32 @@
 
         <label v-if="hasActiveDelivery" class="location-consent">
           <input v-model="locationConsent" type="checkbox" @change="syncLocationSharing" />
-          Share my location with the customer and dispatcher while I deliver active shipments.
+          {{ backgroundLocationSupported
+            ? 'Share my location with the customer and dispatcher, even when this app is in the background. This uses battery; Android shows an ongoing notification and iOS may show a location indicator.'
+            : 'Share my location with the customer and dispatcher while this page is open.' }}
+          Turn this off to stop sharing.
         </label>
-        <p v-if="locationMessage" class="location-message">{{ locationMessage }}</p>
+        <p v-if="locationMessage" class="location-message" role="status" aria-live="polite">
+          {{ locationMessage }}
+        </p>
       </main>
     </ion-content>
   </ion-page>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { Capacitor } from '@capacitor/core';
 import { IonPage, IonContent, onIonViewWillEnter, onIonViewWillLeave } from '@ionic/vue';
 import Navbar from '../components/Navbar.vue';
 import LiveDeliveryMap from '../components/LiveDeliveryMap.vue';
 import {
   acceptShipment, getDeliveryNotifications, getRiderShipments, getShipmentProof,
-  markDeliveryNotificationRead, updateRiderShipment, updateShipmentLocation,
+  markDeliveryNotificationRead, updateRiderShipment,
 } from '../services/api';
+import {
+  isRiderLocationSharing, startRiderLocationSharing, stopRiderLocationSharing,
+} from '../services/riderLocationTracking';
 
 const shipments = ref([]);
 const notifications = ref([]);
@@ -131,16 +148,18 @@ const proof = reactive({ otp: '', recipient_name: '', actual_cod: '', confirmed:
 const failure = reactive({ reason: '', note: '' });
 const rescheduleAt = reactive({});
 const mapOpen = reactive({});
-const watchIds = new Map();
-const lastLocationSent = new Map();
 let refreshTimer;
+let riderPageActive = false;
 const unreadNotifications = computed(() => notifications.value.filter((item) => !item.read_at));
 const hasActiveDelivery = computed(() => shipments.value.some((item) => item.status === 'out_for_delivery'));
+const backgroundLocationSupported = Capacitor.isNativePlatform();
 
 const label = (value = '') => String(value || 'unknown').split('_').map((part) => part[0]?.toUpperCase() + part.slice(1)).join(' ');
 const money = (value) => Number(value || 0).toFixed(2);
 const dateTime = (date) => new Date(date).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
 const isLocationStale = (date) => Date.now() - new Date(date).getTime() > 120000;
+const navigationUrl = (address) =>
+  `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
 const loadProofPhotos = async () => Promise.all(shipments.value
   .filter((shipment) => shipment.photo_filename && !shipment.proof_photo_url)
   .map(async (shipment) => {
@@ -164,45 +183,38 @@ const refreshShipments = async () => {
   }
 };
 
-const sendLocation = (shipment, position) => {
-  const now = Date.now();
-  if (now - (lastLocationSent.get(shipment.id) || 0) < 10000) return;
-  lastLocationSent.set(shipment.id, now);
-  updateShipmentLocation(shipment.id, position.coords.latitude, position.coords.longitude, position.coords.accuracy)
-    .catch(() => {
-      locationMessage.value = 'GPS sharing stopped because this shipment is no longer active.';
-      locationConsent.value = false;
-      syncLocationSharing();
-    });
+const stopSharing = async (shipmentId) => {
+  try {
+    await stopRiderLocationSharing(shipmentId);
+  } catch (err) {
+    locationMessage.value = err.message || 'Could not stop location sharing.';
+  }
 };
-const startLocation = (shipment) => {
-  if (!navigator.geolocation) { locationMessage.value = 'Location is unavailable on this device.'; return; }
-  if (!window.isSecureContext && window.location.hostname !== 'localhost') { locationMessage.value = 'GPS sharing requires HTTPS or the installed mobile app.'; return; }
-  if (watchIds.has(shipment.id)) return;
-  locationMessage.value = 'Sharing GPS every 10 seconds while delivery is active.';
-  const watchId = navigator.geolocation.watchPosition(
-    (position) => sendLocation(shipment, position),
-    (error) => {
-      locationMessage.value = error.code === 1
-        ? 'Location permission was denied. Allow it in device settings, then turn sharing on again.'
-        : 'Current location is unavailable. Check your device location settings and try again.';
-      locationConsent.value = false;
-      syncLocationSharing();
-    },
-    { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
-  );
-  watchIds.set(shipment.id, watchId);
+const syncLocationSharing = () => {
+  const activeShipments = shipments.value.filter((shipment) => shipment.status === 'out_for_delivery');
+  if (!activeShipments.length) {
+    locationConsent.value = false;
+    locationMessage.value = '';
+  }
+
+  shipments.value.forEach((shipment) => {
+    const shouldShare = shipment.status === 'out_for_delivery' && locationConsent.value;
+    if (shouldShare && !isRiderLocationSharing(shipment.id)) {
+      startRiderLocationSharing(shipment.id, {
+        onStatus: (status) => { locationMessage.value = status; },
+        onStopped: () => {
+          locationConsent.value = false;
+        },
+      }).catch((err) => {
+        locationConsent.value = false;
+        locationMessage.value = err.message || 'Could not start location sharing.';
+      });
+    } else if (!shouldShare && isRiderLocationSharing(shipment.id)) {
+      void stopSharing(shipment.id);
+      locationMessage.value = 'Location sharing is off.';
+    }
+  });
 };
-const stopLocation = (shipment) => {
-  const watchId = watchIds.get(shipment.id);
-  if (watchId !== undefined) navigator.geolocation.clearWatch(watchId);
-  watchIds.delete(shipment.id);
-  lastLocationSent.delete(shipment.id);
-};
-const syncLocationSharing = () => shipments.value.forEach((shipment) => {
-  if (shipment.status === 'out_for_delivery' && locationConsent.value) startLocation(shipment);
-  else stopLocation(shipment);
-});
 
 const runStatus = async (shipment, data) => {
   savingId.value = shipment.id;
@@ -253,18 +265,41 @@ const readNotification = async (notification) => {
   catch { error.value = 'Could not mark update as read.'; }
 };
 
+const handleVisibilityChange = () => {
+  if (backgroundLocationSupported) return;
+  if (document.visibilityState === 'hidden') {
+    shipments.value.forEach((shipment) => {
+      if (isRiderLocationSharing(shipment.id)) void stopSharing(shipment.id);
+    });
+    locationMessage.value = 'Web location sharing is paused while this page is in the background.';
+  } else if (riderPageActive && locationConsent.value) {
+    syncLocationSharing();
+  }
+};
+
 const enterRiderPage = async () => {
+  riderPageActive = true;
   await refreshShipments();
   window.clearInterval(refreshTimer);
   refreshTimer = window.setInterval(refreshShipments, 15000);
 };
 const leaveRiderPage = () => {
+  riderPageActive = false;
   window.clearInterval(refreshTimer);
-  shipments.value.forEach(stopLocation);
+  if (!backgroundLocationSupported) {
+    shipments.value.forEach((shipment) => {
+      if (isRiderLocationSharing(shipment.id)) void stopSharing(shipment.id);
+    });
+    locationMessage.value = 'Web location sharing is paused while you leave this page.';
+  }
 };
+onMounted(() => document.addEventListener('visibilitychange', handleVisibilityChange));
 onIonViewWillEnter(enterRiderPage);
 onIonViewWillLeave(leaveRiderPage);
-onBeforeUnmount(leaveRiderPage);
+onBeforeUnmount(() => {
+  leaveRiderPage();
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
+});
 </script>
 
 <style scoped>

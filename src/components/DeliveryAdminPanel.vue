@@ -97,7 +97,6 @@
           <div v-if="mapOpen[shipment.id]" class="in-app-map">
             <LiveDeliveryMap
               :location="shipment.latitude != null ? { latitude: shipment.latitude, longitude: shipment.longitude } : null"
-              :address="shipment.delivery_address || ''"
             />
           </div>
           <div v-if="!['delivered','cancelled','return_to_warehouse'].includes(shipment.status)" class="eta-row">

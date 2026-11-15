@@ -1,8 +1,7 @@
 <template>
   <div class="live-map-shell">
     <div ref="mapElement" class="live-map" aria-label="Live delivery map"></div>
-    <p v-if="mapError" class="map-message">{{ mapError }}</p>
-    <p v-else-if="!location" class="map-message">Waiting for the courier's first location.</p>
+    <p v-if="mapMessage" class="map-message" role="status">{{ mapMessage }}</p>
   </div>
 </template>
 
@@ -11,18 +10,12 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-const props = defineProps({
-  location: { type: Object, default: null },
-  address: { type: String, default: '' },
-});
+const props = defineProps({ location: { type: Object, default: null } });
 
 const mapElement = ref(null);
-const mapError = ref('');
+const mapMessage = ref('Waiting for the courier to share a location.');
 let map;
 let courierMarker;
-let destinationMarker;
-let routeLine;
-let geocodeTimer;
 
 const courierPoint = () => {
   if (!props.location) return null;
@@ -31,7 +24,12 @@ const courierPoint = () => {
 
 const updateCourier = () => {
   const point = courierPoint();
-  if (!map || !point || point.some((value) => !Number.isFinite(value))) return;
+  if (!map) return;
+  if (!point || point.some((value) => !Number.isFinite(value))) {
+    mapMessage.value = 'Waiting for the courier to share a location.';
+    return;
+  }
+  mapMessage.value = '';
   if (!courierMarker) {
     courierMarker = L.circleMarker(point, {
       radius: 9,
@@ -44,74 +42,22 @@ const updateCourier = () => {
   } else {
     courierMarker.setLatLng(point);
   }
-  if (destinationMarker) {
-    routeLine?.setLatLngs([point, destinationMarker.getLatLng()]);
-  } else {
-    map.setView(point, 15);
-  }
-};
-
-const geocodeDestination = async () => {
-  if (!map || !props.address.trim()) return;
-  try {
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(
-        props.address
-      )}`,
-      { headers: { Accept: 'application/json' } }
-    );
-    if (!response.ok) throw new Error('Geocoding request failed.');
-    const results = await response.json();
-    const result = results[0];
-    if (!result) {
-      mapError.value = 'Delivery address could not be located on the map.';
-      return;
-    }
-    const point = [Number(result.lat), Number(result.lon)];
-    destinationMarker?.remove();
-    routeLine?.remove();
-    destinationMarker = L.circleMarker(point, {
-      radius: 8,
-      color: '#198754',
-      fillColor: '#36b37e',
-      fillOpacity: 0.9,
-      weight: 3,
-    }).addTo(map);
-    destinationMarker.bindPopup('Delivery destination');
-    const courier = courierPoint();
-    routeLine = L.polyline(courier ? [courier, point] : [point], {
-      color: '#ff4d8d',
-      dashArray: '8 8',
-      weight: 4,
-    }).addTo(map);
-    const bounds = courier ? L.latLngBounds([courier, point]) : L.latLngBounds([point]);
-    map.fitBounds(bounds, { padding: [28, 28] });
-  } catch (error) {
-    mapError.value = 'Map destination lookup is temporarily unavailable.';
-  }
-};
-
-const scheduleGeocode = () => {
-  window.clearTimeout(geocodeTimer);
-  geocodeTimer = window.setTimeout(geocodeDestination, 350);
+  map.setView(point, 15);
 };
 
 onMounted(() => {
-  map = L.map(mapElement.value, { zoomControl: true });
+  map = L.map(mapElement.value, { zoomControl: true }).setView([12.8797, 121.774], 5);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap contributors',
   }).addTo(map);
   updateCourier();
-  scheduleGeocode();
   window.setTimeout(() => map?.invalidateSize(), 0);
 });
 
 watch(() => props.location, updateCourier, { deep: true });
-watch(() => props.address, scheduleGeocode);
 
 onBeforeUnmount(() => {
-  window.clearTimeout(geocodeTimer);
   map?.remove();
 });
 </script>
