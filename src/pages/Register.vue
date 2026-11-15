@@ -10,7 +10,7 @@
           <div class="orb orb-b"></div>
           <div class="veil"></div>
           <div class="visual-copy">
-            <p class="visual-brand"><img src="/black-elite-logo.png" alt="Black Elite Vape Store" /></p>
+            <div class="visual-brand"><BrandLockup size="auth" /></div>
             <p class="visual-line">Create a customer account to shop.</p>
           </div>
         </aside>
@@ -56,6 +56,7 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent, IonInput, IonButton } from '@ionic/vue';
 import Navbar from '../components/Navbar.vue';
+import BrandLockup from '../components/BrandLockup.vue';
 import { registerUser, saveAuth, homeForRole } from '../services/api';
 
 const router = useRouter();
@@ -153,27 +154,7 @@ const handleRegister = async () => {
 }
 
 .visual-brand {
-  display: flex;
-  align-items: center;
-  gap: 0.35em;
   margin: 0 0 0.4rem;
-  font-family: 'Syne', sans-serif;
-  font-size: clamp(2.2rem, 5vw, 3.4rem);
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #ffffff;
-}
-
-.visual-brand img {
-  width: clamp(10rem, 20vw, 16rem);
-  height: auto;
-  border-radius: 1rem;
-  box-shadow: 0 0 20px rgba(255, 77, 141, 0.3);
-}
-
-.visual-brand span {
-  color: #ff4d8d;
 }
 
 .visual-line {

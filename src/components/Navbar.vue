@@ -7,8 +7,7 @@
 
       <ion-title>
         <router-link to="/home" class="brand-mark" v-if="!showBack">
-          <img src="/black-elite-logo.png" alt="" class="brand-logo" />
-          <span class="brand-name">Black Elite</span>
+          <BrandLockup size="compact" />
         </router-link>
         <span v-else class="page-title">{{ title }}</span>
       </ion-title>
@@ -49,6 +48,7 @@
 
 <script setup>
 import { ref, onMounted, onActivated } from 'vue';
+import BrandLockup from './BrandLockup.vue';
 import { useRouter } from 'vue-router';
 import {
   IonHeader,
@@ -114,25 +114,7 @@ defineExpose({ refresh });
 .brand-mark {
   display: inline-flex;
   align-items: center;
-  gap: 0.28em;
-  font-family: 'Syne', sans-serif;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: #ffffff;
   text-decoration: none;
-}
-
-.brand-logo {
-  width: 2.8rem;
-  height: 2.8rem;
-  object-fit: contain;
-  flex: 0 0 auto;
-}
-
-.brand-name {
-  font-size: .82rem;
-  letter-spacing: .13em;
 }
 
 .brand-mark .accent {

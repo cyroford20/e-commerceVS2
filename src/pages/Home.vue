@@ -22,9 +22,7 @@
         <p class="watermark" aria-hidden="true">VAPE</p>
 
         <div class="hero-copy">
-          <p class="brand rise-in">
-            <img src="/black-elite-logo.png" alt="Black Elite Vape Store" class="hero-logo" />
-          </p>
+          <div class="brand rise-in"><BrandLockup size="hero" /></div>
           <div class="rule rise-in rise-in-delay-1"></div>
           <h1 class="rise-in rise-in-delay-1">Flavor, cut sharp.</h1>
           <p class="lede rise-in rise-in-delay-2">
@@ -140,6 +138,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent, IonSearchbar, IonSpinner, IonButton } from '@ionic/vue';
 import Navbar from '../components/Navbar.vue';
+import BrandLockup from '../components/BrandLockup.vue';
 import ProductCard from '../components/ProductCard.vue';
 import { getProducts, getProductByBarcode, isLoggedIn } from '../services/api';
 import BarcodeScannerButton from '../components/BarcodeScannerButton.vue';
@@ -374,35 +373,7 @@ onMounted(() => {
 .brand {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 0.22em;
   margin: 0 0 1rem;
-  font-family: 'Syne', sans-serif;
-  font-size: clamp(3rem, 11vw, 6.2rem);
-  font-weight: 800;
-  letter-spacing: 0.01em;
-  text-transform: uppercase;
-  line-height: 0.88;
-}
-
-.hero-logo {
-  width: clamp(12rem, 28vw, 19rem);
-  height: auto;
-  border-radius: 1.1rem;
-  box-shadow: 0 0 24px rgba(255, 77, 141, 0.26);
-}
-
-.brand .word {
-  display: inline-block;
-}
-
-.brand .accent {
-  background: linear-gradient(100deg, #ffffff 10%, #ff4d8d 55%, #ff9fc2 100%);
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: shimmer 7s linear infinite;
 }
 
 .rule {
