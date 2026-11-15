@@ -51,6 +51,14 @@ export const getProductByBarcode = (barcode) => {
   return api.get('/products/barcode', { params: { code: barcode } });
 };
 
+export const checkProductBarcodeConflict = (barcode, excludeProductId = null) => {
+  return api.get('/products/barcode/conflict', {
+    params: { code: barcode, exclude_id: excludeProductId || undefined },
+  });
+};
+
+export const validateBuild = (build) => api.post('/products/build/validate', build);
+
 // ---------- ORDERS ----------
 
 export const createOrder = (items, deliveryAddress, deliveryPhone, deliveryZoneId, deliveryInstructions = '', paymentMethod = 'cod') => {
@@ -262,6 +270,9 @@ export const addToCart = (product, quantity = 1) => {
 
   if (existing) {
     existing.quantity += quantity;
+    existing.name = product.name;
+    existing.price = parseFloat(product.price);
+    existing.image_url = product.image_url;
   } else {
     cart.push({
       id: product.id,

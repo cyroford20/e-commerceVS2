@@ -370,7 +370,11 @@
                   Barcode
                   <div class="barcode-field">
                     <input v-model="form.barcode" type="text" maxlength="64" placeholder="Scan or enter EAN/UPC" />
-                    <BarcodeScannerButton label="Scan" @scanned="form.barcode = $event" />
+                    <BarcodeScannerButton
+                      label="Scan"
+                      :disabled="barcodeCheckLoading"
+                      @scanned="checkScannedProductBarcode"
+                    />
                   </div>
                 </label>
                 <label class="full">
@@ -382,9 +386,10 @@
                 <img :src="form.image_url" alt="Preview" />
                 <span>Image preview</span>
               </div>
-              <p class="form-error" v-if="formError">{{ formError }}</p>
+              <p v-if="barcodeCheckLoading" class="muted" role="status">Checking barcode availability...</p>
+              <p class="form-error" v-if="formError" role="alert">{{ formError }}</p>
               <div class="form-actions">
-                <button type="button" class="primary-btn" :disabled="saving" @click="saveProduct">
+                <button type="button" class="primary-btn" :disabled="saving || barcodeCheckLoading" @click="saveProduct">
                   {{ saving ? 'Saving...' : 'Save product' }}
                 </button>
                 <button type="button" class="ghost-btn" @click="editing = false">Cancel</button>
@@ -597,6 +602,7 @@ import {
   getCustomers,
   getOwnerProducts,
   getProductByBarcode,
+  checkProductBarcodeConflict,
   getAllOrders,
   createProduct,
   updateProduct,
@@ -644,6 +650,7 @@ const customers = ref([]);
 const storePageActive = ref(false);
 const loading = ref(true);
 const saving = ref(false);
+const barcodeCheckLoading = ref(false);
 const editing = ref(false);
 const form = ref(emptyForm());
 const formError = ref('');
@@ -927,6 +934,21 @@ const saveProduct = async () => {
   }
 };
 
+const checkScannedProductBarcode = async (barcode) => {
+  formError.value = '';
+  barcodeCheckLoading.value = true;
+  try {
+    await checkProductBarcodeConflict(barcode, form.value.id);
+    form.value.barcode = barcode;
+  } catch (err) {
+    formError.value = err.response?.data?.message || (err.response
+      ? 'Could not verify this barcode. Please try again.'
+      : 'Could not reach the store. Check your internet connection and try again.');
+  } finally {
+    barcodeCheckLoading.value = false;
+  }
+};
+
 const removeProduct = async (product) => {
   if (!window.confirm(`Delete ${product.name}?`)) return;
   error.value = '';
@@ -998,7 +1020,11 @@ const findScannedPosProduct = async (barcode) => {
     else products.value.unshift(product);
     addToPos(product);
   } catch (err) {
-    posError.value = err.response?.data?.message || 'No catalog product matches that barcode.';
+    posError.value = err.response?.status === 404
+      ? 'Product not found. Scan again or search the POS catalog.'
+      : err.response?.data?.message || (err.response
+        ? 'Could not look up this barcode. Please try again.'
+        : 'Could not reach the store. Check your internet connection and try again.');
   } finally {
     posScanLoading.value = false;
   }

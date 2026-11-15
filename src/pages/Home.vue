@@ -207,8 +207,11 @@ const findScannedProduct = async (barcode) => {
     const response = await getProductByBarcode(barcode);
     router.push(`/product/${response.data.id}`);
   } catch (error) {
-    scanError.value =
-      error.response?.data?.message || 'No catalog product matches that barcode.';
+    scanError.value = error.response?.status === 404
+      ? 'Product not found. Scan again or search the catalog.'
+      : error.response?.data?.message || (error.response
+        ? 'Could not look up this barcode. Please try again.'
+        : 'Could not reach the store. Check your internet connection and try again.');
   } finally {
     scanLoading.value = false;
   }

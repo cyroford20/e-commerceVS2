@@ -38,6 +38,17 @@ const getBarcodeConflict = async (barcode) => {
   return result.rows[0];
 };
 
+const getBuildProducts = async (productIds) => {
+  const result = await pool.query(
+    `SELECT id, name, category, price, stock, image_url
+     FROM products
+     WHERE id = ANY($1::int[]) AND active = TRUE
+     ORDER BY array_position($1::int[], id)`,
+    [productIds]
+  );
+  return result.rows;
+};
+
 // Reduce stock after order
 const reduceStock = async (productId, quantity) => {
   await pool.query(
@@ -81,6 +92,7 @@ module.exports = {
   getById,
   getByBarcode,
   getBarcodeConflict,
+  getBuildProducts,
   reduceStock,
   create,
   update,
