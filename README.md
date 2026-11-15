@@ -57,7 +57,7 @@ The shipment workflow is Ready for delivery → Rider assigned → Accepted by r
 
 ## Barcode and location permissions
 
-The scanner uses an in-app camera preview and the rear camera. It does not open Google Lens or the Google Code Scanner UI. Native builds use the existing Capacitor barcode-scanning plugin camera-preview API; web builds use the Barcode Detection API polyfill. Camera permission is required. Riders must separately opt in to GPS sharing while delivering. Android and iOS declare the required camera and location permissions.
+The scanner requests the rear camera through the in-app WebView, displays its live feed in the scan frame, and decodes barcodes locally with the ZXing WebAssembly detector. It does not launch Google Lens, Google Code Scanner, or another app. Camera permission is required. Riders separately opt in to GPS sharing while delivering. Android and iOS declare the required camera and location permissions.
 
 After changing native dependencies or permissions, sync and build the mobile project:
 

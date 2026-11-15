@@ -7,15 +7,9 @@
     <div v-if="scanning" class="barcode-scanner-overlay">
       <div class="scanner-card">
         <div class="scanner-camera-window">
-          <video
-            v-if="isWeb"
-            ref="videoElement"
-            class="scanner-video"
-            autoplay
-            muted
-            playsinline
-          ></video>
+          <video ref="videoElement" class="scanner-video" autoplay muted playsinline></video>
           <div class="scanner-frame" aria-hidden="true"></div>
+          <span v-if="!cameraReady" class="scanner-loading">Starting camera…</span>
         </div>
         <h2>Scan barcode</h2>
         <p>Camera access is used only to scan a product barcode. Point the rear camera at the barcode.</p>
@@ -28,11 +22,9 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, ref, watch } from 'vue';
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import 'barcode-detector/polyfill';
-import { Capacitor } from '@capacitor/core';
-import { BarcodeFormat, BarcodeScanner, LensFacing } from '@capacitor-mlkit/barcode-scanning';
+import { BarcodeDetector as BarcodeDetectorPonyfill } from 'barcode-detector/ponyfill';
 
 defineProps({
   label: { type: String, default: 'Scan barcode' },
@@ -42,84 +34,129 @@ defineProps({
 const emit = defineEmits(['scanned']);
 const route = useRoute();
 const scanning = ref(false);
+const cameraReady = ref(false);
 const errorMessage = ref('');
 const videoElement = ref(null);
-const isWeb = Capacitor.getPlatform() === 'web';
-let scanListener;
 let scanHandled = false;
 let scannerSession = 0;
+let cameraStream;
+let detectionTimer;
 
-const cleanup = async () => {
+const barcodeFormats = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'];
+
+const cleanup = () => {
   scannerSession += 1;
-  document.body.classList.remove('barcode-scanner-active');
-  if (scanListener) {
-    await scanListener.remove();
-    scanListener = null;
+  if (detectionTimer) {
+    window.clearTimeout(detectionTimer);
+    detectionTimer = undefined;
   }
-  await BarcodeScanner.stopScan().catch(() => {});
+  cameraStream?.getTracks().forEach((track) => track.stop());
+  cameraStream = undefined;
+  if (videoElement.value) {
+    videoElement.value.pause();
+    videoElement.value.srcObject = null;
+  }
+  cameraReady.value = false;
   scanning.value = false;
 };
 
-const stopScanner = async () => {
-  await cleanup();
+const stopScanner = () => cleanup();
+
+const formatCameraError = (error) => {
+  if (['NotAllowedError', 'PermissionDeniedError', 'SecurityError'].includes(error?.name)) {
+    return 'Camera access is blocked. Allow camera permission in your device settings, then try again.';
+  }
+  if (['NotFoundError', 'DevicesNotFoundError'].includes(error?.name)) {
+    return 'No camera was found on this device.';
+  }
+  if (['NotReadableError', 'TrackStartError'].includes(error?.name)) {
+    return 'The camera is busy in another app. Close it and try scanning again.';
+  }
+  return error?.message || 'Could not start the camera. Check camera permission and try again.';
+};
+
+const finishScan = (value) => {
+  if (scanHandled) return;
+  scanHandled = true;
+  cleanup();
+  emit('scanned', value);
+};
+
+const scanVideo = async (session, detector, video, detectorState) => {
+  if (session !== scannerSession || !scanning.value || scanHandled) return;
+
+  if (!detectorState.inProgress && video.readyState >= 2) {
+    detectorState.inProgress = true;
+    try {
+      const results = await detector.detect(video);
+      if (session !== scannerSession) return;
+      const value = results.find((item) => item.rawValue?.trim())?.rawValue?.trim();
+      if (value) {
+        await finishScan(value);
+        return;
+      }
+    } catch (error) {
+      if (session === scannerSession) {
+        errorMessage.value = 'Barcode detection failed. Close the scanner and try again.';
+        cleanup();
+        return;
+      }
+    } finally {
+      detectorState.inProgress = false;
+    }
+  }
+
+  if (session === scannerSession && scanning.value) {
+    detectionTimer = window.setTimeout(() => scanVideo(session, detector, video, detectorState), 180);
+  }
 };
 
 const startScanner = async () => {
+  if (scanning.value) return;
   errorMessage.value = '';
   scanHandled = false;
+  cameraReady.value = false;
   scanning.value = true;
   const session = ++scannerSession;
 
   try {
-    const support = await BarcodeScanner.isSupported();
-    if (session !== scannerSession) return;
-    if (!support.supported) {
-      throw new Error('This device does not have a camera available for barcode scanning.');
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error('Live camera access is unavailable. Install and open the mobile app, then try again.');
+    }
+    if (!window.isSecureContext && location.hostname !== 'localhost') {
+      throw new Error('Camera access requires HTTPS or the installed mobile app.');
     }
 
-    if (!isWeb) {
-      const permission = await BarcodeScanner.checkPermissions();
-      if (permission.camera !== 'granted') {
-        const requested = await BarcodeScanner.requestPermissions();
-        if (requested.camera !== 'granted') {
-          throw new Error('Camera permission is required. Allow camera access in app settings and try again.');
-        }
-      }
-    }
+    await nextTick();
     if (session !== scannerSession) return;
 
-    document.body.classList.add('barcode-scanner-active');
-    const eventName = isWeb ? 'barcodesScanned' : 'barcodeScanned';
-    scanListener = await BarcodeScanner.addListener(eventName, async (result) => {
-      if (scanHandled) return;
-      const barcode = result.barcode || result.barcodes?.[0];
-      const value = barcode?.rawValue?.trim();
-      if (!value) return;
-      scanHandled = true;
-      await cleanup();
-      emit('scanned', value);
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
     });
     if (session !== scannerSession) {
-      await cleanup();
+      stream.getTracks().forEach((track) => track.stop());
       return;
     }
 
-    await BarcodeScanner.startScan({
-      formats: [
-        BarcodeFormat.Ean13,
-        BarcodeFormat.Ean8,
-        BarcodeFormat.UpcA,
-        BarcodeFormat.UpcE,
-        BarcodeFormat.Code128,
-      ],
-      lensFacing: LensFacing.Back,
-      ...(isWeb ? { videoElement: videoElement.value } : {}),
-    });
-    if (session !== scannerSession) await cleanup();
+    cameraStream = stream;
+    const video = videoElement.value;
+    if (!video) throw new Error('The camera preview could not be displayed. Close the scanner and retry.');
+    video.srcObject = stream;
+    await video.play();
+    if (session !== scannerSession) return;
+
+    const detector = new BarcodeDetectorPonyfill({ formats: barcodeFormats });
+    cameraReady.value = true;
+    scanVideo(session, detector, video, { inProgress: false });
   } catch (error) {
     const stillActive = session === scannerSession;
-    await cleanup();
-    if (stillActive) errorMessage.value = error.message || 'Could not start the barcode scanner.';
+    cleanup();
+    if (stillActive) errorMessage.value = formatCameraError(error);
   }
 };
 
@@ -180,7 +217,7 @@ watch(() => route.fullPath, () => {
   width: min(90vw, 360px);
   padding: 1.5rem;
   border-radius: 20px;
-  background: rgba(23, 16, 23, 0.45);
+  background: rgba(23, 16, 23, 0.94);
   text-align: center;
 }
 
@@ -190,14 +227,25 @@ watch(() => route.fullPath, () => {
   height: 140px;
   overflow: hidden;
   border-radius: 14px;
-  background: transparent;
+  background: #000;
 }
 
 .scanner-video {
+  display: block;
   width: 100%;
   height: 100%;
   background: #000;
   object-fit: cover;
+}
+
+.scanner-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: .85rem;
+  text-shadow: 0 1px 4px #000;
 }
 
 .scanner-card h2,
@@ -225,28 +273,4 @@ watch(() => route.fullPath, () => {
   color: #fff;
 }
 
-:global(body.barcode-scanner-active) {
-  visibility: hidden;
-  --background: transparent;
-  --ion-background-color: transparent;
-  background: transparent !important;
-}
-
-:global(html.barcode-scanner-active),
-:global(body.barcode-scanner-active ion-app),
-:global(body.barcode-scanner-active ion-router-outlet),
-:global(body.barcode-scanner-active .ion-page),
-:global(body.barcode-scanner-active ion-content) {
-  --background: transparent !important;
-  --ion-background-color: transparent !important;
-  background: transparent !important;
-}
-
-:global(body.barcode-scanner-active #app) {
-  background: transparent !important;
-}
-
-:global(body.barcode-scanner-active .barcode-scanner-overlay) {
-  visibility: visible;
-}
 </style>
