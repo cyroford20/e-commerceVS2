@@ -43,6 +43,51 @@ const ensureBarcodeSchema = async () => {
   console.log('Verified products.barcode column and unique index.');
 };
 
+const seedPhilippineBarangays = async () => {
+  const sourceVersion = '2026-10-12';
+  const imported = await pool.query(
+    'SELECT record_count FROM philippine_geography_sources WHERE version = $1',
+    [sourceVersion]
+  );
+  if (imported.rows[0]?.record_count === 42010) return;
+
+  const locations = JSON.parse(fs.readFileSync(
+    path.resolve(__dirname, '../database/philippine_barangays.json'), 'utf8'
+  ));
+  if (locations.length !== 42010 || new Set(locations.map((location) => location.psgc_code)).size !== 42010) {
+    throw new Error('Philippine barangay reference data failed count or PSGC code validation.');
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `INSERT INTO philippine_barangays (psgc_code, barangay, city, province, region)
+       SELECT item.psgc_code, item.barangay, item.city, item.province, item.region
+       FROM jsonb_to_recordset($1::jsonb) AS item(
+         psgc_code text, barangay text, city text, province text, region text
+       )
+       ON CONFLICT (psgc_code) DO UPDATE SET
+         barangay = EXCLUDED.barangay, city = EXCLUDED.city,
+         province = EXCLUDED.province, region = EXCLUDED.region,
+         updated_at = CURRENT_TIMESTAMP`,
+      [JSON.stringify(locations)]
+    );
+    await client.query('DELETE FROM philippine_geography_sources');
+    await client.query(
+      'INSERT INTO philippine_geography_sources (version, record_count) VALUES ($1, $2)',
+      [sourceVersion, locations.length]
+    );
+    await client.query('COMMIT');
+    console.log(`Imported ${locations.length} Philippine barangays from PSGC snapshot ${sourceVersion}.`);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -71,6 +116,7 @@ const startServer = async () => {
     'utf8'
   );
   await pool.query(deliverySchema);
+  await seedPhilippineBarangays();
   app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });

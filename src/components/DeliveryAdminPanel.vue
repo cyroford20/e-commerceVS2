@@ -167,7 +167,26 @@
       </section>
 
       <section v-else-if="section === 'zones'" class="panel">
-        <header><h3>Delivery zones and fees</h3><p>Customers select a configured barangay at checkout.</p></header>
+        <header><h3>Delivery zones and fees</h3><p>Search the nationwide PSGC list, set an editable fee, then activate the barangays your store serves.</p></header>
+        <form class="zone-search" @submit.prevent="searchBarangays">
+          <input v-model="zoneSearch" required minlength="2" placeholder="Search barangay, city, province, or region" />
+          <button class="secondary" :disabled="zoneSearchLoading">{{ zoneSearchLoading ? 'Searching...' : 'Search locations' }}</button>
+        </form>
+        <p v-if="zoneSearchResults.length" class="form-hint">Showing up to 50 locations. Set a fee to enable delivery; fees remain editable.</p>
+        <div v-if="zoneSearchResults.length" class="zone-list location-results">
+          <article v-for="location in zoneSearchResults" :key="location.psgc_code" class="zone-row">
+            <div>
+              <strong>{{ location.barangay }}</strong>
+              <span>{{ location.city }}<template v-if="location.province">, {{ location.province }}</template> · {{ location.region }}</span>
+              <small>PSGC {{ location.psgc_code }}<template v-if="location.zone_id"> · {{ location.zone_active ? 'Active' : 'Inactive' }}</template></small>
+            </div>
+            <label>Fee PHP <input v-model.number="location.delivery_fee" required type="number" min="0" step="0.01" placeholder="Set fee" /></label>
+            <button class="secondary" :disabled="saving || location.delivery_fee === null || location.delivery_fee === ''" @click="saveLocationZone(location)">
+              {{ location.zone_id ? 'Save & activate' : 'Enable zone' }}
+            </button>
+          </article>
+        </div>
+        <p v-else-if="zoneSearchDone" class="form-hint">No locations matched that search.</p>
         <form class="form-grid" @submit.prevent="createZone">
           <input v-model="zoneForm.name" required placeholder="Zone name" />
           <input v-model="zoneForm.city" required placeholder="City / municipality" />
@@ -221,7 +240,8 @@ import {
   assignShipment, autoAssignShipment, createDeliveryRider, createDeliveryVehicle,
   createDeliveryZone, getAdminDeliveryDashboard, getAdminDeliveryZones,
   getAdminShipments, getCodSummary, getDeliveryRiders, getDeliveryVehicles,
-  remitShipmentCod, updateDeliveryRider, updateDeliveryVehicle, updateDeliveryZone, updateShipmentEta,
+  remitShipmentCod, savePhilippineDeliveryZone, searchPhilippineBarangays,
+  updateDeliveryRider, updateDeliveryVehicle, updateDeliveryZone, updateShipmentEta,
 } from '../services/api';
 import LiveDeliveryMap from './LiveDeliveryMap.vue';
 
@@ -242,6 +262,10 @@ const dashboard = ref({ daily: [] });
 const shipments = ref([]);
 const riders = ref([]);
 const zones = ref([]);
+const zoneSearch = ref('');
+const zoneSearchResults = ref([]);
+const zoneSearchLoading = ref(false);
+const zoneSearchDone = ref(false);
 const vehicles = ref([]);
 const codRows = ref([]);
 const assignment = reactive({});
@@ -373,6 +397,41 @@ const createZone = async () => {
   catch (err) { error.value = err.response?.data?.message || 'Could not create zone.'; }
   finally { saving.value = false; }
 };
+const searchBarangays = async () => {
+  zoneSearchLoading.value = true;
+  zoneSearchDone.value = false;
+  error.value = '';
+  try {
+    const response = await searchPhilippineBarangays(zoneSearch.value.trim());
+    zoneSearchResults.value = response.data.map((location) => ({
+      ...location,
+      delivery_fee: location.delivery_fee == null ? '' : Number(location.delivery_fee),
+    }));
+    zoneSearchDone.value = true;
+  } catch (err) {
+    error.value = err.response?.data?.message || 'Could not search Philippine locations.';
+  } finally {
+    zoneSearchLoading.value = false;
+  }
+};
+const saveLocationZone = async (location) => {
+  saving.value = true;
+  error.value = '';
+  message.value = '';
+  try {
+    await savePhilippineDeliveryZone({
+      psgc_code: location.psgc_code,
+      delivery_fee: Number(location.delivery_fee),
+      active: true,
+    });
+    message.value = `${location.barangay}, ${location.city} is now an active delivery zone.`;
+    await Promise.all([loadAll(), searchBarangays()]);
+  } catch (err) {
+    error.value = err.response?.data?.message || 'Could not save the delivery zone.';
+  } finally {
+    saving.value = false;
+  }
+};
 const saveZone = async (zone) => {
   try { await updateDeliveryZone(zone.id, { ...zone, delivery_fee: Number(zone.delivery_fee) }); message.value = 'Delivery zone updated.'; await loadAll(); }
   catch (err) { error.value = err.response?.data?.message || 'Could not update zone.'; }
@@ -428,6 +487,7 @@ input,select { min-width: 0; padding: .7rem; border: 1px solid #e4d5dc; border-r
 .shipment-card,.rider-row,.zone-row { padding: .9rem 0; border-top: 1px solid #eee5ea; }.shipment-head { display: flex; justify-content: space-between; gap: 1rem; }.shipment-head h4 { margin: .55rem 0 .25rem; }.shipment-head p { margin: 0 0 .35rem; color: #5e5058; }.shipment-head small,.rider-info small { color: #75666e; }.code { font-weight: 800; color: #be235f; margin-right: .55rem; }.pill { display: inline-block; border-radius: 20px; padding: .25rem .55rem; background: #fff0f5; color: #a52054; font-size: .75rem; font-weight: 700; }
 .rider-info { display: grid; justify-items: end; align-content: start; gap: .25rem; text-align: right; }.rider-info a { color: #b32258; font-size: .8rem; }.assign-row select { flex: 1; }.shipment-card details { margin-top: .7rem; }.shipment-card summary { cursor: pointer; font-size: .85rem; font-weight: 700; }.history-line { display: grid; grid-template-columns: 150px 1fr auto; gap: .6rem; padding: .4rem; border-top: 1px solid #eee5ea; font-size: .82rem; }.history-line small { color: #75666e; }.remit-row input { width: 145px; }.remitted { color: #277e5a; font-size: .85rem; }
 .form-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .6rem; margin: 1rem 0; }.form-grid select[multiple] { min-height: 82px; }.form-hint { color: #75666e; font-size: .78rem; }.rider-row,.zone-row { display: flex; justify-content: space-between; align-items: center; gap: .7rem; }.rider-row > div,.zone-row > div { display: grid; gap: .18rem; flex: 1; }.rider-row span,.rider-row small,.zone-row span { color: #75666e; font-size: .8rem; }.zone-row label { display: flex; gap: .35rem; align-items: center; }.zone-row label input[type=number] { width: 110px; }.check input { accent-color: #ff4d8d; }
+.zone-search { display: flex; gap: .6rem; margin: 1rem 0; }.zone-search input { flex: 1; }.location-results { max-height: 36rem; overflow-y: auto; padding: 0 .4rem; }.location-results .zone-row > div { min-width: 12rem; }
 .rider-edit { grid-template-columns: repeat(2,minmax(0,1fr)); }.zone-edit { display: flex !important; gap: .4rem; }
 .eta-row { display: flex; flex-wrap: wrap; align-items: center; gap: .55rem; margin: .8rem 0; }.eta-row label { display: flex; align-items: center; gap: .4rem; }
 .table-wrap { overflow-x: auto; }table { width: 100%; border-collapse: collapse; text-align: left; }th,td { padding: .65rem; border-bottom: 1px solid #eee5ea; white-space: nowrap; }th { color: #75666e; font-size: .8rem; }

@@ -25,14 +25,41 @@ CREATE UNIQUE INDEX IF NOT EXISTS rider_profiles_active_vehicle_unique_idx
 
 CREATE TABLE IF NOT EXISTS delivery_zones (
   id SERIAL PRIMARY KEY,
-  name VARCHAR(100) NOT NULL UNIQUE,
+  name VARCHAR(240) NOT NULL,
   city VARCHAR(100) NOT NULL,
   barangay VARCHAR(100) NOT NULL,
+  province VARCHAR(100),
+  region VARCHAR(120),
+  psgc_code VARCHAR(10),
   delivery_fee NUMERIC(10, 2) NOT NULL CHECK (delivery_fee >= 0),
   active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (city, barangay)
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE delivery_zones ADD COLUMN IF NOT EXISTS province VARCHAR(100);
+ALTER TABLE delivery_zones ADD COLUMN IF NOT EXISTS region VARCHAR(120);
+ALTER TABLE delivery_zones ADD COLUMN IF NOT EXISTS psgc_code VARCHAR(10);
+ALTER TABLE delivery_zones ALTER COLUMN name TYPE VARCHAR(240);
+ALTER TABLE delivery_zones DROP CONSTRAINT IF EXISTS delivery_zones_city_barangay_key;
+ALTER TABLE delivery_zones DROP CONSTRAINT IF EXISTS delivery_zones_name_key;
+CREATE UNIQUE INDEX IF NOT EXISTS delivery_zones_psgc_code_unique_idx
+  ON delivery_zones(psgc_code);
+
+CREATE TABLE IF NOT EXISTS philippine_barangays (
+  psgc_code VARCHAR(10) PRIMARY KEY,
+  barangay VARCHAR(100) NOT NULL,
+  city VARCHAR(100) NOT NULL,
+  province VARCHAR(100),
+  region VARCHAR(120) NOT NULL,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS philippine_barangays_lookup_idx
+  ON philippine_barangays(region, province, city, barangay);
+CREATE TABLE IF NOT EXISTS philippine_geography_sources (
+  version VARCHAR(32) PRIMARY KEY,
+  record_count INTEGER NOT NULL,
+  imported_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS rider_zone_coverage (

@@ -25,6 +25,36 @@ const listZones = async (req, res) => {
   }
 };
 
+const searchPhilippineBarangays = async (req, res) => {
+  try {
+    const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    if (query.length < 2 || query.length > 100) {
+      return res.status(400).json({ message: 'Enter at least two characters to search barangays.' });
+    }
+    res.json(await deliveryModel.searchPhilippineBarangays(query));
+  } catch (error) {
+    sendError(res, error, 'Could not search Philippine barangays.');
+  }
+};
+
+const savePhilippineZone = async (req, res) => {
+  try {
+    const psgcCode = typeof req.body.psgc_code === 'string' ? req.body.psgc_code.trim() : '';
+    const fee = Number(req.body.delivery_fee);
+    const active = req.body.active === undefined ? true : req.body.active;
+    if (!/^\d{10}$/.test(psgcCode) || !validMoney(fee) || typeof active !== 'boolean') {
+      return res.status(400).json({ message: 'Provide a valid PSGC barangay code, delivery fee, and active flag.' });
+    }
+    const zone = await deliveryModel.savePhilippineDeliveryZone({
+      psgcCode, deliveryFee: fee, active,
+    });
+    if (!zone) return res.status(404).json({ message: 'Barangay was not found in the Philippine location list.' });
+    res.json(zone);
+  } catch (error) {
+    sendError(res, error, 'Could not save delivery zone.');
+  }
+};
+
 const createZone = async (req, res) => {
   try {
     const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
@@ -48,7 +78,7 @@ const updateZone = async (req, res) => {
     const city = typeof req.body.city === 'string' ? req.body.city.trim() : '';
     const barangay = typeof req.body.barangay === 'string' ? req.body.barangay.trim() : '';
     const fee = Number(req.body.delivery_fee);
-    if (!id || !name || name.length > 100 || !city || city.length > 100 ||
+    if (!id || !name || name.length > 240 || !city || city.length > 100 ||
         !barangay || barangay.length > 100 ||
         !validMoney(fee) || typeof req.body.active !== 'boolean') {
       return res.status(400).json({ message: 'Provide a valid zone name, city, barangay, fee, and active flag.' });
@@ -302,7 +332,7 @@ const codSummary = async (req, res) => {
 };
 
 module.exports = {
-  listZones, createZone, updateZone, listVehicles, createVehicle, updateVehicle,
+  listZones, searchPhilippineBarangays, savePhilippineZone, createZone, updateZone, listVehicles, createVehicle, updateVehicle,
   listRiders, createRider, updateRider, dashboard, listShipments,
   assignRider, autoAssignRider, riderShipments, acceptShipment,
   updateShipmentEta,

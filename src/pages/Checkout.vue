@@ -31,7 +31,7 @@
             <select v-model="deliveryZoneId" required>
               <option value="">Choose your barangay</option>
               <option v-for="zone in deliveryZones" :key="zone.id" :value="String(zone.id)">
-                {{ zone.barangay }}, {{ zone.city }} - PHP {{ formatPrice(zone.delivery_fee) }}
+                {{ zone.barangay }}, {{ zone.city }}<template v-if="zone.province">, {{ zone.province }}</template> - PHP {{ formatPrice(zone.delivery_fee) }}
               </option>
             </select>
           </label>
@@ -45,7 +45,7 @@
             <button type="button" class="retry-zones" @click="loadDeliveryZones">Retry loading zones</button>
           </div>
           <p v-else-if="deliveryZones.length === 0" class="error-msg" role="alert">
-            The store has not configured any active delivery barangays yet, so orders are temporarily unavailable. The store owner must add a barangay and delivery fee under Store &gt; Delivery &gt; Zones &amp; fees.
+            The store has no active delivery barangays yet, so orders are temporarily unavailable. The store owner must search for a barangay, set its fee, and activate it under Store &gt; Delivery &gt; Zones &amp; fees.
           </p>
           <p class="payment-note">Payment: Cash on delivery</p>
         </div>

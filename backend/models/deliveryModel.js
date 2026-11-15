@@ -43,13 +43,51 @@ const notify = async (client, shipmentId, userId, kind, message) => {
 
 const getZones = async (activeOnly = true) => {
   const result = await pool.query(
-    `SELECT id, name, city, barangay, delivery_fee, active
+    `SELECT id, name, city, barangay, province, region, psgc_code, delivery_fee, active
      FROM delivery_zones
      WHERE ($1::boolean = FALSE OR active = TRUE)
-     ORDER BY city, barangay`,
+     ORDER BY region NULLS LAST, province NULLS LAST, city, barangay`,
     [activeOnly]
   );
   return result.rows;
+};
+
+const searchPhilippineBarangays = async (query) => {
+  const result = await pool.query(
+    `SELECT b.psgc_code, b.barangay, b.city, b.province, b.region,
+            z.id AS zone_id, z.delivery_fee, z.active AS zone_active
+     FROM philippine_barangays b
+     LEFT JOIN delivery_zones z ON z.psgc_code = b.psgc_code
+     WHERE b.barangay ILIKE $1 OR b.city ILIKE $1 OR b.province ILIKE $1 OR b.region ILIKE $1
+        OR concat_ws(', ', b.barangay, b.city, b.province, b.region) ILIKE $1
+     ORDER BY CASE
+       WHEN lower(b.city) = lower($2) THEN 0
+       WHEN lower(b.barangay) = lower($2) THEN 1
+       WHEN lower(COALESCE(b.province, '')) = lower($2) THEN 2
+       WHEN lower(b.city) LIKE lower($3) THEN 3
+       WHEN lower(b.barangay) LIKE lower($3) THEN 4
+       ELSE 5
+     END, b.region, b.province NULLS FIRST, b.city, b.barangay
+     LIMIT 50`,
+    [`%${query}%`, query, `${query.toLowerCase()}%`]
+  );
+  return result.rows;
+};
+
+const savePhilippineDeliveryZone = async ({ psgcCode, deliveryFee, active = true }) => {
+  const result = await pool.query(
+    `INSERT INTO delivery_zones (name, city, barangay, province, region, psgc_code, delivery_fee, active)
+     SELECT LEFT(b.barangay || ', ' || b.city || COALESCE(', ' || b.province, ''), 240),
+            b.city, b.barangay, b.province, b.region, b.psgc_code, $2, $3
+     FROM philippine_barangays b WHERE b.psgc_code = $1
+     ON CONFLICT (psgc_code) DO UPDATE SET
+       delivery_fee = EXCLUDED.delivery_fee,
+       active = EXCLUDED.active,
+       updated_at = CURRENT_TIMESTAMP
+     RETURNING id, name, city, barangay, province, region, psgc_code, delivery_fee, active`,
+    [psgcCode, deliveryFee, active]
+  );
+  return result.rows[0] || null;
 };
 
 const createZone = async ({ name, city, barangay, deliveryFee }) => {
@@ -690,6 +728,8 @@ const getCodSummary = async (from, to) => {
 module.exports = {
   problem,
   getZones,
+  searchPhilippineBarangays,
+  savePhilippineDeliveryZone,
   createZone,
   updateZone,
   listVehicles,

@@ -74,6 +74,7 @@ export const createOrder = (items, deliveryAddress, deliveryPhone, deliveryZoneI
 
 export const getDeliveryZones = () => api.get('/delivery/zones');
 export const getAdminDeliveryZones = () => api.get('/delivery/zones', { params: { all: true } });
+export const searchPhilippineBarangays = (query) => api.get('/delivery/admin/locations', { params: { q: query } });
 
 export const getAdminDeliveryDashboard = () => api.get('/delivery/admin/dashboard');
 export const getAdminShipments = (params = {}) => api.get('/delivery/admin/shipments', { params });
@@ -90,6 +91,7 @@ export const getDeliveryVehicles = () => api.get('/delivery/admin/vehicles');
 export const createDeliveryVehicle = (vehicle) => api.post('/delivery/admin/vehicles', vehicle);
 export const updateDeliveryVehicle = (id, vehicle) => api.put(`/delivery/admin/vehicles/${id}`, vehicle);
 export const createDeliveryZone = (zone) => api.post('/delivery/admin/zones', zone);
+export const savePhilippineDeliveryZone = (zone) => api.post('/delivery/admin/zones/from-psgc', zone);
 export const updateDeliveryZone = (id, zone) => api.put(`/delivery/admin/zones/${id}`, zone);
 export const getCodSummary = (params = {}) => api.get('/delivery/admin/cod', { params });
 export const remitShipmentCod = (shipmentId, actualAmount, notes = '') =>

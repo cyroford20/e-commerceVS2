@@ -19,6 +19,7 @@ const handleProofUpload = (req, res, next) => {
 
 router.get('/zones', deliveryController.listZones);
 router.get('/admin/dashboard', ...ownerOnly, deliveryController.dashboard);
+router.get('/admin/locations', ...ownerOnly, deliveryController.searchPhilippineBarangays);
 router.get('/admin/shipments', ...ownerOnly, deliveryController.listShipments);
 router.post('/admin/shipments/:id/assign', ...ownerOnly, deliveryController.assignRider);
 router.post('/admin/shipments/:id/auto-assign', ...ownerOnly, deliveryController.autoAssignRider);
@@ -30,6 +31,7 @@ router.get('/admin/vehicles', ...ownerOnly, deliveryController.listVehicles);
 router.post('/admin/vehicles', ...ownerOnly, deliveryController.createVehicle);
 router.put('/admin/vehicles/:id', ...ownerOnly, deliveryController.updateVehicle);
 router.post('/admin/zones', ...ownerOnly, deliveryController.createZone);
+router.post('/admin/zones/from-psgc', ...ownerOnly, deliveryController.savePhilippineZone);
 router.put('/admin/zones/:id', ...ownerOnly, deliveryController.updateZone);
 router.get('/admin/cod', ...ownerOnly, deliveryController.codSummary);
 router.post('/admin/shipments/:id/cod-remittance', ...ownerOnly, deliveryController.remitCod);
