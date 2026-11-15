@@ -7,7 +7,8 @@
 
       <ion-title>
         <router-link to="/home" class="brand-mark" v-if="!showBack">
-          <img src="/logo.svg" alt="Black Elite Vape Store" class="brand-logo" />
+          <img src="/black-elite-logo.png" alt="" class="brand-logo" />
+          <span class="brand-name">Black Elite</span>
         </router-link>
         <span v-else class="page-title">{{ title }}</span>
       </ion-title>
@@ -123,9 +124,15 @@ defineExpose({ refresh });
 }
 
 .brand-logo {
-  width: 8.5rem;
-  height: auto;
+  width: 2.8rem;
+  height: 2.8rem;
   object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.brand-name {
+  font-size: .82rem;
+  letter-spacing: .13em;
 }
 
 .brand-mark .accent {

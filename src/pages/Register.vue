@@ -10,7 +10,7 @@
           <div class="orb orb-b"></div>
           <div class="veil"></div>
           <div class="visual-copy">
-            <p class="visual-brand"><img src="/logo.svg" alt="Black Elite Vape Store" /></p>
+            <p class="visual-brand"><img src="/black-elite-logo.png" alt="Black Elite Vape Store" /></p>
             <p class="visual-line">Create a customer account to shop.</p>
           </div>
         </aside>
@@ -166,9 +166,10 @@ const handleRegister = async () => {
 }
 
 .visual-brand img {
-  width: clamp(12rem, 22vw, 20rem);
+  width: clamp(10rem, 20vw, 16rem);
   height: auto;
-  box-shadow: 0 0 20px rgba(255, 77, 141, 0.45);
+  border-radius: 1rem;
+  box-shadow: 0 0 20px rgba(255, 77, 141, 0.3);
 }
 
 .visual-brand span {

@@ -23,7 +23,7 @@
 
         <div class="hero-copy">
           <p class="brand rise-in">
-            <img src="/logo.svg" alt="Black Elite Vape Store" class="hero-logo" />
+            <img src="/black-elite-logo.png" alt="Black Elite Vape Store" class="hero-logo" />
           </p>
           <div class="rule rise-in rise-in-delay-1"></div>
           <h1 class="rise-in rise-in-delay-1">Flavor, cut sharp.</h1>
@@ -386,9 +386,10 @@ onMounted(() => {
 }
 
 .hero-logo {
-  width: clamp(15rem, 42vw, 28rem);
+  width: clamp(12rem, 28vw, 19rem);
   height: auto;
-  box-shadow: 0 0 30px rgba(255, 77, 141, 0.42);
+  border-radius: 1.1rem;
+  box-shadow: 0 0 24px rgba(255, 77, 141, 0.26);
 }
 
 .brand .word {
