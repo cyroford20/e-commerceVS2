@@ -937,13 +937,19 @@ const saveProduct = async () => {
 const checkScannedProductBarcode = async (barcode) => {
   formError.value = '';
   barcodeCheckLoading.value = true;
+  const previousBarcode = form.value.barcode;
+  form.value.barcode = barcode;
   try {
     await checkProductBarcodeConflict(barcode, form.value.id);
-    form.value.barcode = barcode;
   } catch (err) {
-    formError.value = err.response?.data?.message || (err.response
-      ? 'Could not verify this barcode. Please try again.'
-      : 'Could not reach the store. Check your internet connection and try again.');
+    if ([400, 409].includes(err.response?.status)) {
+      form.value.barcode = previousBarcode;
+      formError.value = err.response?.data?.message || 'This barcode could not be accepted.';
+    } else {
+      formError.value = err.response
+        ? 'Barcode scanned and filled in, but the server could not check it. Retry Scan, or save to run the database uniqueness check.'
+        : 'Barcode scanned and filled in, but the store could not be reached. Check your connection, then retry Scan or save to run the database uniqueness check.';
+    }
   } finally {
     barcodeCheckLoading.value = false;
   }
