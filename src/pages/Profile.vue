@@ -34,6 +34,31 @@
           </article>
         </section>
 
+        <section class="panel coupon-wallet">
+          <div class="coupon-wallet-heading">
+            <div>
+              <h3>My coupons</h3>
+              <p class="hint">Rewards earned from your completed orders.</p>
+            </div>
+            <ion-spinner v-if="couponsLoading" name="crescent"></ion-spinner>
+          </div>
+          <p v-if="couponsError" class="form-error" role="alert">{{ couponsError }}</p>
+          <p v-else-if="!couponsLoading && coupons.length === 0" class="hint">No issued coupons yet. Keep shopping to earn rewards.</p>
+          <div v-else class="coupon-wallet-list">
+            <article v-for="coupon in coupons" :key="coupon.id" class="customer-coupon">
+              <div>
+                <strong>{{ coupon.name }}</strong>
+                <span class="coupon-code">{{ coupon.code }}</span>
+                <span>
+                  {{ coupon.discount_type === 'percent' ? `${coupon.discount_value}% off` : `PHP ${formatPrice(coupon.discount_value)} off` }}
+                  · Expires {{ formatCouponDate(coupon.expires_at) }}
+                </span>
+              </div>
+              <span :class="['coupon-state', coupon.status]">{{ coupon.status }}</span>
+            </article>
+          </div>
+        </section>
+
         <section class="panel">
           <h3>Edit profile</h3>
           <label>
@@ -70,12 +95,16 @@ import {
   getMe,
   updateMe,
   getUserOrders,
+  getMyCoupons,
   saveAuth,
   getToken,
 } from '../services/api';
 
 const user = ref(null);
 const orders = ref([]);
+const coupons = ref([]);
+const couponsLoading = ref(false);
+const couponsError = ref('');
 const editName = ref('');
 const loading = ref(true);
 const saving = ref(false);
@@ -98,6 +127,11 @@ const totalSpent = computed(() =>
 );
 
 const formatPrice = (price) => parseFloat(price || 0).toFixed(2);
+const formatCouponDate = (date) => new Date(date).toLocaleDateString('en-PH', {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+});
 
 const loadProfile = async () => {
   loading.value = true;
@@ -112,6 +146,16 @@ const loadProfile = async () => {
     if (me.data?.id) {
       const orderRes = await getUserOrders(me.data.id);
       orders.value = orderRes.data;
+      couponsLoading.value = true;
+      couponsError.value = '';
+      try {
+        const couponRes = await getMyCoupons();
+        coupons.value = couponRes.data;
+      } catch (couponErr) {
+        couponsError.value = couponErr.response?.data?.message || 'Could not load your coupons.';
+      } finally {
+        couponsLoading.value = false;
+      }
     }
   } catch (err) {
     error.value = err.response?.data?.message || 'Could not load your profile.';
@@ -151,6 +195,66 @@ onMounted(loadProfile);
   max-width: 640px;
   margin: 0 auto;
   padding: 1.5rem 1.25rem 3rem;
+}
+
+.coupon-wallet-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.coupon-wallet-heading h3,
+.coupon-wallet-heading p {
+  margin-top: 0;
+}
+
+.coupon-wallet-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.customer-coupon {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.8rem;
+  border: 1px solid #f0d7e2;
+  border-radius: 14px;
+  background: #fffafd;
+}
+
+.customer-coupon > div {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  color: #68636a;
+  font-size: 0.86rem;
+}
+
+.coupon-code {
+  color: #a51052;
+  font-family: monospace;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.coupon-state {
+  flex-shrink: 0;
+  padding: 0.3rem 0.55rem;
+  border-radius: 999px;
+  background: #e7f8ee;
+  color: #166c3e;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.coupon-state.used,
+.coupon-state.expired {
+  background: #eee;
+  color: #666;
 }
 
 .hero-card {

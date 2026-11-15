@@ -32,6 +32,10 @@
               <span>POS</span>
               <em v-if="posItemCount">{{ posItemCount }}</em>
             </button>
+            <button type="button" :class="{ active: tab === 'coupons' }" @click="openCoupons">
+              <span class="nav-ico"><ion-icon :icon="pricetagOutline"></ion-icon></span>
+              <span>Coupons &amp; Discounts</span>
+            </button>
             <button type="button" :class="{ active: tab === 'orders' }" @click="tab = 'orders'">
               <span class="nav-ico"><ion-icon :icon="receiptOutline"></ion-icon></span>
               <span>Orders</span>
@@ -277,13 +281,40 @@
 
                 <label class="pos-customer">
                   Customer
-                  <select v-model="posCustomerId">
+                  <select v-model="posCustomerId" @change="clearPosDiscount">
                     <option value="walkin">Walk-in customer</option>
                     <option v-for="customer in customers" :key="customer.id" :value="String(customer.id)">
                       {{ customer.name }} ? {{ customer.email }}
                     </option>
                   </select>
                 </label>
+
+                <div class="pos-discount-controls">
+                  <label>
+                    Coupon code
+                    <span class="input-action">
+                      <input v-model="posCouponCode" type="text" maxlength="64" autocomplete="off" placeholder="Enter coupon code" @input="clearAppliedPosCoupon" />
+                      <button type="button" class="ghost-btn" :disabled="!posCart.length || posCouponApplying" @click="applyPosCoupon">
+                        {{ posCouponApplying ? 'Checking...' : 'Apply' }}
+                      </button>
+                    </span>
+                  </label>
+                  <label>
+                    Or manual discount (PHP)
+                    <input
+                      v-model="posManualDiscount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      inputmode="decimal"
+                      :disabled="!!posCoupon"
+                      @input="clearPosCoupon"
+                    />
+                  </label>
+                  <p v-if="posCouponMessage" :class="posCoupon ? 'form-ok' : 'form-error'" role="status">
+                    {{ posCouponMessage }}
+                  </p>
+                </div>
 
                 <div v-if="posCart.length === 0" class="panel-empty pos-empty">
                   Tap products to build the sale.
@@ -311,12 +342,34 @@
                 </div>
 
                 <div class="pos-footer">
-                  <div class="pos-total">
-                    <span>Total due</span>
-                    <strong>PHP {{ formatPrice(posTotal) }}</strong>
+                  <div class="pos-breakdown">
+                    <div><span>Subtotal</span><strong>PHP {{ formatPrice(posSubtotal) }}</strong></div>
+                    <div><span>Discount</span><strong>- PHP {{ formatPrice(posDiscount) }}</strong></div>
+                    <div class="pos-total"><span>Total due</span><strong>PHP {{ formatPrice(posTotal) }}</strong></div>
+                  </div>
+                  <label class="pos-tender">
+                    Amount received (PHP)
+                    <input v-model="posTendered" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" />
+                  </label>
+                  <p v-if="posCart.length && !posTendered" class="muted" role="status">
+                    Enter the cash received to enable sale completion.
+                  </p>
+                  <p v-else-if="posCart.length && Number(posTendered) < posTotal" class="form-error" role="alert">
+                    Amount received is less than the total due.
+                  </p>
+                  <div class="pos-change">
+                    <span>Change</span>
+                    <strong>PHP {{ formatPrice(posChange) }}</strong>
                   </div>
                   <p class="form-error" v-if="posError">{{ posError }}</p>
                   <p class="form-ok" v-if="posOk">{{ posOk }}</p>
+                  <div v-if="posReceipt" class="pos-receipt" role="status" aria-live="polite">
+                    <strong>Receipt - Sale #{{ posReceipt.id }}</strong>
+                    <span>Discount: PHP {{ formatPrice(posReceipt.discount_amount) }}</span>
+                    <span>Total: PHP {{ formatPrice(posReceipt.total) }}</span>
+                    <span>Received: PHP {{ formatPrice(posReceipt.payment?.amount_tendered) }}</span>
+                    <span>Change: PHP {{ formatPrice(posReceipt.payment?.change_amount) }}</span>
+                  </div>
                   <div class="pos-footer-actions">
                     <button
                       v-if="posCart.length"
@@ -329,7 +382,7 @@
                     <button
                       type="button"
                       class="primary-btn pos-pay"
-                      :disabled="!posCart.length || posWorking"
+                      :disabled="!posCanComplete || posWorking || posCouponApplying"
                       @click="completePosSale"
                     >
                       {{ posWorking ? 'Processing...' : 'Complete sale' }}
@@ -337,6 +390,105 @@
                   </div>
                 </div>
               </aside>
+            </div>
+          </section>
+
+          <section v-if="tab === 'coupons'" class="view">
+            <div class="panel glass">
+              <div class="panel-head">
+                <div>
+                  <h3>{{ editingCampaignId ? 'Edit campaign' : 'Create campaign' }}</h3>
+                  <p class="muted">Set coupon terms or a purchase-frequency reward.</p>
+                </div>
+              </div>
+              <form class="form-grid campaign-form" @submit.prevent="saveCampaign">
+                <label>Campaign name<input v-model="campaignForm.name" required maxlength="120" /></label>
+                <label>Coupon code<input v-model="campaignForm.code" required maxlength="64" autocomplete="off" /></label>
+                <label>
+                  Discount type
+                  <select v-model="campaignForm.discount_type">
+                    <option value="fixed">Fixed amount</option>
+                    <option value="percent">Percentage</option>
+                  </select>
+                </label>
+                <label>
+                  Discount value
+                  <input v-model="campaignForm.discount_value" type="number" min="0.01" :max="campaignForm.discount_type === 'percent' ? 100 : undefined" step="0.01" required />
+                </label>
+                <label>Minimum order (PHP)<input v-model="campaignForm.minimum_order_total" type="number" min="0" step="0.01" /></label>
+                <label>Maximum discount (PHP, optional)<input v-model="campaignForm.maximum_discount_amount" type="number" min="0.01" step="0.01" /></label>
+                <label>Starts at<input v-model="campaignForm.starts_at" type="datetime-local" required /></label>
+                <label>Expires at (optional)<input v-model="campaignForm.expires_at" type="datetime-local" /></label>
+                <label>Total uses (optional)<input v-model="campaignForm.max_redemptions" type="number" min="1" step="1" /></label>
+                <label>Uses per customer<input v-model="campaignForm.max_redemptions_per_customer" type="number" min="1" step="1" required /></label>
+                <label class="campaign-reward-toggle">
+                  <input
+                    type="checkbox"
+                    :checked="!!campaignForm.qualifying_order_count"
+                    @change="toggleRewardCampaign($event.target.checked)"
+                  />
+                  Purchase-frequency reward
+                </label>
+                <label>
+                  Completed orders required (default 5)
+                  <input v-model="campaignForm.qualifying_order_count" type="number" min="1" step="1" :disabled="!campaignForm.qualifying_order_count" />
+                </label>
+                <label>
+                  Qualification period
+                  <select v-model="campaignForm.qualification_period" :disabled="!campaignForm.qualifying_order_count">
+                    <option value="week">Calendar week</option>
+                    <option value="month">Calendar month</option>
+                  </select>
+                </label>
+                <label>Reward expires after (days)<input v-model="campaignForm.reward_expiration_days" type="number" min="1" max="365" step="1" required /></label>
+                <label class="campaign-active">
+                  <input v-model="campaignForm.active" type="checkbox" />
+                  Campaign active
+                </label>
+                <div class="form-actions full">
+                  <button type="submit" class="primary-btn" :disabled="campaignSaving">
+                    {{ campaignSaving ? 'Saving...' : editingCampaignId ? 'Save campaign' : 'Create campaign' }}
+                  </button>
+                  <button v-if="editingCampaignId" type="button" class="ghost-btn" @click="resetCampaignForm">Cancel edit</button>
+                </div>
+              </form>
+              <p v-if="campaignError" class="form-error" role="alert">{{ campaignError }}</p>
+              <p v-if="campaignOk" class="form-ok" role="status">{{ campaignOk }}</p>
+            </div>
+
+            <div class="panel glass">
+              <div class="panel-head">
+                <div>
+                  <h3>Campaigns</h3>
+                  <p class="muted">{{ couponCampaigns.length }} campaigns</p>
+                </div>
+                <button type="button" class="link-btn" @click="loadCouponCampaigns">Refresh</button>
+              </div>
+              <p v-if="campaignsLoading" class="panel-empty" role="status">Loading campaigns...</p>
+              <p v-else-if="!couponCampaigns.length" class="panel-empty">No campaigns yet.</p>
+              <div v-else class="campaign-list">
+                <article v-for="campaign in couponCampaigns" :key="campaign.id" class="campaign-card">
+                  <div class="campaign-card-top">
+                    <div><strong>{{ campaign.name }}</strong><span class="mono">{{ campaign.code }}</span></div>
+                    <span :class="['tag', { inactive: !campaign.active }]">{{ campaign.active ? 'Active' : 'Inactive' }}</span>
+                  </div>
+                  <p>
+                    {{ campaign.discount_type === 'percent' ? `${campaign.discount_value}%` : `PHP ${formatPrice(campaign.discount_value)}` }}
+                    off · Minimum PHP {{ formatPrice(campaign.minimum_order_total) }}
+                  </p>
+                  <p v-if="campaign.qualifying_order_count">
+                    Reward after {{ campaign.qualifying_order_count }} completed orders per {{ campaign.qualification_period }}:
+                    {{ campaign.qualifying_customer_count }} qualified · {{ campaign.issued_reward_count }} issued
+                  </p>
+                  <p v-else>{{ campaign.redemption_count }} redemptions</p>
+                  <div class="campaign-actions">
+                    <button type="button" class="ghost-btn" @click="editCampaign(campaign)">Edit</button>
+                    <button type="button" class="ghost-btn" :disabled="campaignSavingId === campaign.id" @click="toggleCampaign(campaign)">
+                      {{ campaignSavingId === campaign.id ? 'Saving...' : campaign.active ? 'Deactivate' : 'Activate' }}
+                    </button>
+                  </div>
+                </article>
+              </div>
             </div>
           </section>
 
@@ -487,6 +639,15 @@
                       </div>
                     </div>
                   </div>
+                  <div v-if="Number(order.discount_amount) > 0 || order.payment" class="order-payment-summary">
+                    <span v-if="Number(order.discount_amount) > 0">
+                      Discount: PHP {{ formatPrice(order.discount_amount) }}
+                    </span>
+                    <template v-if="order.payment">
+                      <span>Cash received: PHP {{ formatPrice(order.payment.amount_tendered) }}</span>
+                      <strong>Change: PHP {{ formatPrice(order.payment.change_amount) }}</strong>
+                    </template>
+                  </div>
                 </article>
               </div>
             </div>
@@ -595,6 +756,7 @@ import {
   personOutline,
   storefrontOutline,
   navigateOutline,
+  pricetagOutline,
 } from 'ionicons/icons';
 import {
   getMe,
@@ -608,6 +770,10 @@ import {
   updateProduct,
   deleteProduct,
   createPosOrder,
+  validateCoupon,
+  getCouponCampaigns,
+  createCouponCampaign,
+  updateCouponCampaign,
   saveAuth,
   getToken,
   logout,
@@ -627,10 +793,47 @@ const posScanLoading = ref(false);
 const productStatusSavingId = ref(null);
 const posError = ref('');
 const posOk = ref('');
+const posCouponCode = ref('');
+const posCoupon = ref(null);
+const posCouponMessage = ref('');
+const posCouponApplying = ref(false);
+const posManualDiscount = ref('');
+const posTendered = ref('');
+const posReceipt = ref(null);
+const couponCampaigns = ref([]);
+const campaignsLoading = ref(false);
+const campaignSaving = ref(false);
+const campaignSavingId = ref(null);
+const editingCampaignId = ref(null);
+const campaignError = ref('');
+const campaignOk = ref('');
+const campaignForm = ref(emptyCampaignForm());
 const ownerName = ref('');
 const savingProfile = ref(false);
 const profileError = ref('');
 const profileOk = ref(false);
+
+function emptyCampaignForm() {
+  const now = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16);
+  return {
+    name: '',
+    code: '',
+    discount_type: 'fixed',
+    discount_value: '',
+    minimum_order_total: '0',
+    maximum_discount_amount: '',
+    starts_at: now,
+    expires_at: '',
+    max_redemptions: '',
+    max_redemptions_per_customer: '1',
+    qualifying_order_count: '',
+    qualification_period: 'week',
+    reward_expiration_days: '30',
+    active: true,
+  };
+}
 
 const emptyForm = () => ({
   id: null,
@@ -659,6 +862,7 @@ const error = ref('');
 const pageTitle = computed(() => {
   if (tab.value === 'products') return 'Products';
   if (tab.value === 'pos') return 'Point of Sale';
+  if (tab.value === 'coupons') return 'Coupons & Discounts';
   if (tab.value === 'orders') return 'Orders';
   if (tab.value === 'delivery') return 'Delivery';
   if (tab.value === 'customers') return 'Customers';
@@ -669,6 +873,7 @@ const pageTitle = computed(() => {
 const pageSubhead = computed(() => {
   if (tab.value === 'products') return 'Control pricing, stock, and media for every SKU.';
   if (tab.value === 'pos') return 'Ring up walk-in sales and sync stock instantly.';
+  if (tab.value === 'coupons') return 'Manage coupon campaigns and purchase-frequency rewards.';
   if (tab.value === 'orders') return 'Track every customer checkout in one place.';
   if (tab.value === 'delivery') return 'Assign couriers and keep customers updated.';
   if (tab.value === 'customers') return 'See every shopper account and their spend.';
@@ -778,9 +983,34 @@ const posItemCount = computed(() =>
   posCart.value.reduce((sum, line) => sum + line.quantity, 0)
 );
 
-const posTotal = computed(() =>
+const posSubtotal = computed(() =>
   posCart.value.reduce((sum, line) => sum + line.price * line.quantity, 0)
 );
+
+const posDiscount = computed(() => {
+  const discount = posCoupon.value
+    ? Number(posCoupon.value.discount_amount)
+    : Number(posManualDiscount.value || 0);
+  return Number.isFinite(discount) ? Math.min(posSubtotal.value, Math.max(0, discount)) : 0;
+});
+
+const posTotal = computed(() => Math.max(0, posSubtotal.value - posDiscount.value));
+const posChange = computed(() => {
+  const tendered = Number(posTendered.value);
+  return Number.isFinite(tendered) && tendered >= posTotal.value ? tendered - posTotal.value : 0;
+});
+const posCanComplete = computed(() => {
+  const tenderText = String(posTendered.value).trim();
+  const manualText = String(posManualDiscount.value).trim();
+  const tendered = Number(tenderText);
+  const manual = Number(manualText || 0);
+  return posCart.value.length > 0 &&
+    /^\d+(?:\.\d{1,2})?$/.test(tenderText) &&
+    Number.isFinite(tendered) && tendered >= posTotal.value &&
+    (!manualText || (/^\d+(?:\.\d{1,2})?$/.test(manualText) && Number.isFinite(manual) && manual <= posSubtotal.value)) &&
+    (!posCouponCode.value.trim() || !!posCoupon.value) &&
+    !posCouponApplying.value;
+});
 
 const customerInitials = (name = '') =>
   name
@@ -989,6 +1219,7 @@ const toggleProductActive = async (product) => {
 };
 
 const addToPos = (product) => {
+  clearPosDiscount();
   posError.value = '';
   posOk.value = '';
   const stock = Number(product.stock);
@@ -1037,6 +1268,7 @@ const findScannedPosProduct = async (barcode) => {
 };
 
 const changePosQty = (productId, delta) => {
+  clearPosDiscount();
   posError.value = '';
   posOk.value = '';
   const line = posCart.value.find((item) => item.id === productId);
@@ -1059,17 +1291,65 @@ const changePosQty = (productId, delta) => {
 };
 
 const removeFromPos = (productId) => {
+  clearPosDiscount();
   posCart.value = posCart.value.filter((item) => item.id !== productId);
 };
 
 const clearPos = () => {
   posCart.value = [];
+  clearPosDiscount();
   posError.value = '';
   posOk.value = '';
 };
 
+const clearPosCoupon = () => {
+  posCoupon.value = null;
+  posCouponMessage.value = '';
+  posCouponCode.value = '';
+};
+
+const clearAppliedPosCoupon = () => {
+  posCoupon.value = null;
+  posCouponMessage.value = '';
+};
+
+const clearPosDiscount = () => {
+  clearPosCoupon();
+  posManualDiscount.value = '';
+  posTendered.value = '';
+  posReceipt.value = null;
+};
+
+const applyPosCoupon = async () => {
+  posError.value = '';
+  posOk.value = '';
+  posCouponMessage.value = '';
+  if (!posCouponCode.value.trim()) {
+    posCouponMessage.value = 'Enter a coupon code.';
+    return;
+  }
+  posCouponApplying.value = true;
+  try {
+    const items = posCart.value.map((line) => ({
+      product_id: line.id,
+      quantity: line.quantity,
+    }));
+    const customerId = posCustomerId.value === 'walkin' ? null : Number(posCustomerId.value);
+    const response = await validateCoupon(posCouponCode.value.trim(), items, customerId);
+    posCoupon.value = response.data;
+    posManualDiscount.value = '';
+    posCouponMessage.value = `${response.data.campaign_name} applied: PHP ${formatPrice(response.data.discount_amount)} off.`;
+    if (Number(response.data.total) === 0) posTendered.value = '0';
+  } catch (err) {
+    posCoupon.value = null;
+    posCouponMessage.value = err.response?.data?.message || 'Could not validate this coupon.';
+  } finally {
+    posCouponApplying.value = false;
+  }
+};
+
 const completePosSale = async () => {
-  if (!posCart.value.length) return;
+  if (!posCanComplete.value) return;
 
   posWorking.value = true;
   posError.value = '';
@@ -1082,15 +1362,32 @@ const completePosSale = async () => {
   const customerId =
     posCustomerId.value === 'walkin' ? null : Number(posCustomerId.value);
 
+  let res;
   try {
-    const res = await createPosOrder(items, customerId);
+    res = await createPosOrder(
+      items,
+      customerId,
+      posTendered.value,
+      posCoupon.value?.code || null,
+      posManualDiscount.value.trim() || null
+    );
     const orderId = res.data.order?.id;
-    posOk.value = orderId
-      ? `Sale #${orderId} completed.`
-      : 'Sale completed.';
+    posReceipt.value = res.data.order || null;
+    posOk.value = orderId ? `Sale #${orderId} completed.` : 'Sale completed.';
     posCart.value = [];
     posCustomerId.value = 'walkin';
+    posCouponCode.value = '';
+    posCoupon.value = null;
+    posCouponMessage.value = '';
+    posManualDiscount.value = '';
+    posTendered.value = '';
+  } catch (err) {
+    posError.value = err.response?.data?.message || 'Could not complete the sale.';
+    posWorking.value = false;
+    return;
+  }
 
+  try {
     const [catalog, orderList, customerList] = await Promise.all([
       getOwnerProducts(),
       getAllOrders(),
@@ -1100,9 +1397,128 @@ const completePosSale = async () => {
     orders.value = orderList.data;
     customers.value = customerList.data;
   } catch (err) {
-    posError.value = err.response?.data?.message || 'Could not complete the sale.';
+    posError.value = err.response?.data?.message
+      ? `Sale completed, but refresh failed: ${err.response.data.message}`
+      : 'Sale completed, but the store data could not refresh. Avoid submitting this sale again.';
   } finally {
     posWorking.value = false;
+  }
+};
+
+const toggleRewardCampaign = (enabled) => {
+  campaignForm.value.qualifying_order_count = enabled
+    ? campaignForm.value.qualifying_order_count || '5'
+    : '';
+};
+
+const localInputDate = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+};
+
+const campaignPayload = (campaign = campaignForm.value) => ({
+  name: campaign.name,
+  code: campaign.code,
+  discount_type: campaign.discount_type,
+  discount_value: campaign.discount_value,
+  minimum_order_total: campaign.minimum_order_total || 0,
+  maximum_discount_amount: campaign.maximum_discount_amount || null,
+  starts_at: campaign.starts_at ? new Date(campaign.starts_at).toISOString() : null,
+  expires_at: campaign.expires_at ? new Date(campaign.expires_at).toISOString() : null,
+  active: campaign.active,
+  max_redemptions: campaign.max_redemptions || null,
+  max_redemptions_per_customer: campaign.max_redemptions_per_customer || 1,
+  qualifying_order_count: campaign.qualifying_order_count || null,
+  qualification_period: campaign.qualifying_order_count ? campaign.qualification_period : null,
+  reward_expiration_days: campaign.reward_expiration_days || 30,
+});
+
+const resetCampaignForm = () => {
+  campaignForm.value = emptyCampaignForm();
+  editingCampaignId.value = null;
+  campaignError.value = '';
+};
+
+const loadCouponCampaigns = async () => {
+  campaignsLoading.value = true;
+  campaignError.value = '';
+  try {
+    const response = await getCouponCampaigns();
+    couponCampaigns.value = response.data;
+  } catch (err) {
+    campaignError.value = err.response?.data?.message || 'Could not load coupon campaigns.';
+  } finally {
+    campaignsLoading.value = false;
+  }
+};
+
+const openCoupons = () => {
+  tab.value = 'coupons';
+  campaignOk.value = '';
+  loadCouponCampaigns();
+};
+
+const editCampaign = (campaign) => {
+  editingCampaignId.value = campaign.id;
+  campaignError.value = '';
+  campaignOk.value = '';
+  campaignForm.value = {
+    name: campaign.name,
+    code: campaign.code,
+    discount_type: campaign.discount_type,
+    discount_value: String(campaign.discount_value),
+    minimum_order_total: String(campaign.minimum_order_total),
+    maximum_discount_amount: campaign.maximum_discount_amount == null ? '' : String(campaign.maximum_discount_amount),
+    starts_at: localInputDate(campaign.starts_at),
+    expires_at: localInputDate(campaign.expires_at),
+    max_redemptions: campaign.max_redemptions == null ? '' : String(campaign.max_redemptions),
+    max_redemptions_per_customer: String(campaign.max_redemptions_per_customer),
+    qualifying_order_count: campaign.qualifying_order_count == null ? '' : String(campaign.qualifying_order_count),
+    qualification_period: campaign.qualification_period || 'week',
+    reward_expiration_days: String(campaign.reward_expiration_days),
+    active: campaign.active,
+  };
+};
+
+const saveCampaign = async () => {
+  campaignError.value = '';
+  campaignOk.value = '';
+  campaignSaving.value = true;
+  try {
+    const payload = campaignPayload();
+    if (editingCampaignId.value) {
+      await updateCouponCampaign(editingCampaignId.value, payload);
+      campaignOk.value = 'Campaign updated.';
+    } else {
+      await createCouponCampaign(payload);
+      campaignOk.value = 'Campaign created.';
+    }
+    resetCampaignForm();
+    await loadCouponCampaigns();
+  } catch (err) {
+    campaignError.value = err.response?.data?.message || 'Could not save this campaign.';
+  } finally {
+    campaignSaving.value = false;
+  }
+};
+
+const toggleCampaign = async (campaign) => {
+  campaignSavingId.value = campaign.id;
+  campaignError.value = '';
+  campaignOk.value = '';
+  try {
+    await updateCouponCampaign(campaign.id, campaignPayload({
+      ...campaign,
+      starts_at: localInputDate(campaign.starts_at),
+      expires_at: localInputDate(campaign.expires_at),
+    }));
+    campaignOk.value = `Campaign ${campaign.active ? 'deactivated' : 'activated'}.`;
+    await loadCouponCampaigns();
+  } catch (err) {
+    campaignError.value = err.response?.data?.message || 'Could not update this campaign.';
+  } finally {
+    campaignSavingId.value = null;
   }
 };
 
@@ -2237,6 +2653,169 @@ onIonViewWillLeave(() => {
   font-weight: 500;
 }
 
+.pos-discount-controls {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 0.8rem;
+}
+
+.pos-discount-controls label,
+.pos-tender {
+  display: grid;
+  gap: 0.35rem;
+  color: #666;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.pos-discount-controls input,
+.pos-tender input,
+.campaign-form select,
+.campaign-form input:not([type='checkbox']) {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  padding: 0.65rem 0.75rem;
+  background: #fff;
+  color: #111;
+  font: inherit;
+}
+
+.input-action {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.input-action .ghost-btn {
+  min-height: 44px;
+  padding: 0.55rem 0.8rem;
+}
+
+.pos-breakdown {
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.pos-breakdown > div,
+.pos-change {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.pos-breakdown span,
+.pos-change span {
+  color: #777;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.pos-breakdown strong,
+.pos-change strong {
+  text-align: right;
+}
+
+.pos-breakdown .pos-total {
+  margin: 0;
+  padding-top: 0.45rem;
+  border-top: 1px solid #efefef;
+}
+
+.pos-tender {
+  margin-bottom: 0.55rem;
+}
+
+.pos-change {
+  margin-bottom: 0.6rem;
+}
+
+.pos-receipt {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0.65rem 0;
+  padding: 0.75rem;
+  border: 1px solid #b7e5cd;
+  border-radius: 12px;
+  background: #f2fff7;
+  color: #155d39;
+  font-size: 0.84rem;
+}
+
+.campaign-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 0.75rem;
+}
+
+.campaign-card {
+  min-width: 0;
+  padding: 0.9rem;
+  border: 1px solid #ece8ea;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.campaign-card-top,
+.campaign-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.campaign-card-top > div {
+  min-width: 0;
+}
+
+.campaign-card-top strong,
+.campaign-card-top .mono {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.campaign-card p {
+  color: #68636a;
+  font-size: 0.88rem;
+}
+
+.campaign-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.campaign-form .campaign-active {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.campaign-form input[type='checkbox'] {
+  width: 22px;
+  height: 22px;
+  accent-color: #d4146a;
+}
+
+.campaign-form .form-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.order-payment-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 1rem;
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid #f0f0f0;
+  color: #68636a;
+  font-size: 0.84rem;
+}
+
 .pos-empty {
   flex: 1;
 }
@@ -2607,11 +3186,18 @@ onIonViewWillLeave(() => {
     z-index: 15;
     width: 100%;
     min-height: 0;
-    max-height: 46vh;
+    max-height: 70vh;
     margin-bottom: 0;
     overflow: auto;
     border-radius: 18px;
     box-shadow: 0 -10px 28px rgba(17, 17, 17, 0.12);
+  }
+
+  .pos-discount-controls input,
+  .pos-tender input,
+  .campaign-form select,
+  .campaign-form input:not([type='checkbox']) {
+    font-size: 16px;
   }
 
   .pos-empty {

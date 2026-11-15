@@ -1,5 +1,9 @@
 const pool = require('../config/db');
 const deliveryModel = require('./deliveryModel');
+const couponModel = require('./couponModel');
+const { moneyToCents, tenderChangeCents } = require('../utils/couponRules');
+const asMoney = (cents) => (cents / 100).toFixed(2);
+const MAX_MONEY_CENTS = 9999999999;
 
 // Ensure channel column exists on older databases
 const ensureChannelColumn = async () => {
@@ -47,7 +51,8 @@ const create = async (
   deliveryPhone,
   deliveryZoneId,
   deliveryInstructions = null,
-  paymentMethod = 'cod'
+  paymentMethod = 'cod',
+  couponCode = null
 ) => {
   await readyChannel();
   const client = await pool.connect();
@@ -80,7 +85,7 @@ const create = async (
     }
 
     const pricedItems = [];
-    let itemsTotal = 0;
+    let itemsTotalCents = 0;
     for (const [productId, quantity] of requestedQuantities) {
       const productResult = await client.query(
         `SELECT id, price, stock FROM products WHERE id = $1 AND active = TRUE FOR UPDATE`, [productId]
@@ -96,20 +101,52 @@ const create = async (
         err.status = 409;
         throw err;
       }
-      const price = Number(product.price);
-      itemsTotal += price * quantity;
-      pricedItems.push({ productId, quantity, price });
+      const priceCents = moneyToCents(product.price);
+      itemsTotalCents += priceCents * quantity;
+      pricedItems.push({ productId, quantity, price: asMoney(priceCents) });
     }
-    const deliveryFee = Number(zone.delivery_fee);
-    const orderTotal = Number((itemsTotal + deliveryFee).toFixed(2));
+    if (itemsTotalCents > MAX_MONEY_CENTS) {
+      const err = new Error('The order subtotal exceeds the supported payment amount.');
+      err.status = 400;
+      throw err;
+    }
+    const coupon = couponCode
+      ? await couponModel.getCouponDiscount(client, {
+        code: couponCode,
+        customerId: userId,
+        subtotalCents: itemsTotalCents,
+        lock: true,
+      })
+      : null;
+    const discountCents = coupon?.discountCents || 0;
+    const deliveryFeeCents = moneyToCents(zone.delivery_fee);
+    const orderTotalCents = itemsTotalCents - discountCents + deliveryFeeCents;
+    if (orderTotalCents > MAX_MONEY_CENTS) {
+      const err = new Error('The order total exceeds the supported payment amount.');
+      err.status = 400;
+      throw err;
+    }
+    const orderTotal = asMoney(orderTotalCents);
 
     const orderResult = await client.query(
       `INSERT INTO orders
-       (user_id, total, channel, delivery_address, delivery_phone, delivery_zone_id,
+       (user_id, total, subtotal, discount_amount, coupon_code, channel, delivery_address, delivery_phone, delivery_zone_id,
         delivery_fee, delivery_instructions, payment_method, payment_status, delivery_status)
-       VALUES ($1, $2, 'online', $3, $4, $5, $6, $7, $8, 'pending', 'ready_for_delivery')
+       VALUES ($1, $2, $3, $4, $5, 'online', $6, $7, $8, $9, $10, $11, 'pending', 'ready_for_delivery')
        RETURNING *`,
-      [userId, orderTotal, deliveryAddress, deliveryPhone, zone.id, deliveryFee, deliveryInstructions, paymentMethod]
+      [
+        userId,
+        orderTotal,
+        asMoney(itemsTotalCents),
+        asMoney(discountCents),
+        coupon?.code || null,
+        deliveryAddress,
+        deliveryPhone,
+        zone.id,
+        asMoney(deliveryFeeCents),
+        deliveryInstructions,
+        paymentMethod,
+      ]
     );
     const order = orderResult.rows[0];
     await client.query(
@@ -131,9 +168,10 @@ const create = async (
     }
 
     const shipment = await deliveryModel.createShipmentForOrder(
-      client, order, zone.id, deliveryFee, paymentMethod
+      client, order, zone.id, deliveryFeeCents / 100, paymentMethod
     );
 
+    if (coupon) await couponModel.recordRedemption(client, coupon, userId, order.id);
     await client.query('COMMIT');
     return { ...order, shipment, delivery_otp: shipment.delivery_otp };
   } catch (error) {
@@ -145,14 +183,19 @@ const create = async (
 };
 
 // POS sale: price + stock checked from DB inside a transaction
-const createPos = async (userId, items) => {
+const createPos = async (userId, items, {
+  customerId = null,
+  amountTendered,
+  couponCode = null,
+  manualDiscountAmount = null,
+} = {}) => {
   await readyChannel();
   const client = await pool.connect();
 
   try {
     await client.query('BEGIN');
 
-    let total = 0;
+    let subtotalCents = 0;
     const pricedItems = [];
 
     for (const item of items) {
@@ -186,21 +229,76 @@ const createPos = async (userId, items) => {
         throw err;
       }
 
-      const price = Number(product.price);
-      total += price * quantity;
+      const priceCents = moneyToCents(product.price);
+      subtotalCents += priceCents * quantity;
       pricedItems.push({
         product_id: product.id,
         quantity,
-        price,
+        price: asMoney(priceCents),
       });
+    }
+    if (subtotalCents > MAX_MONEY_CENTS) {
+      const err = new Error('The sale subtotal exceeds the supported payment amount.');
+      err.status = 400;
+      throw err;
+    }
+
+    const hasManualDiscount = manualDiscountAmount !== null &&
+      manualDiscountAmount !== undefined && String(manualDiscountAmount).trim() !== '';
+    if (couponCode && hasManualDiscount) {
+      const err = new Error('Apply either a coupon or a manual discount, not both.');
+      err.status = 400;
+      throw err;
+    }
+
+    let coupon = null;
+    let discountCents = 0;
+    if (couponCode) {
+      coupon = await couponModel.getCouponDiscount(client, {
+        code: couponCode,
+        customerId,
+        subtotalCents,
+        lock: true,
+      });
+      discountCents = coupon.discountCents;
+    } else if (hasManualDiscount) {
+      discountCents = moneyToCents(manualDiscountAmount);
+      if (discountCents === null || discountCents > subtotalCents) {
+        const err = new Error('Enter a valid discount no greater than the sale subtotal.');
+        err.status = 400;
+        throw err;
+      }
+    }
+
+    const totalDueCents = subtotalCents - discountCents;
+    const changeCents = tenderChangeCents(asMoney(totalDueCents), amountTendered);
+    if (changeCents === null) {
+      const err = new Error(totalDueCents === 0
+        ? 'Enter a valid cash amount received (0.00 is valid for a zero-total sale).'
+        : 'Amount received must be valid and at least the total due.');
+      err.status = 400;
+      throw err;
+    }
+    const tenderedCents = moneyToCents(amountTendered);
+    if (tenderedCents > MAX_MONEY_CENTS) {
+      const err = new Error('Amount received exceeds the supported payment amount.');
+      err.status = 400;
+      throw err;
     }
 
     const orderResult = await client.query(
       `INSERT INTO orders
-       (user_id, total, channel, delivery_status)
-       VALUES ($1, $2, 'pos', 'delivered')
+       (user_id, total, subtotal, discount_amount, coupon_code, channel,
+        payment_method, payment_status, delivery_status, completed_at)
+       VALUES ($1, $2, $3, $4, $5, 'pos', 'cash', 'paid', 'delivered', CURRENT_TIMESTAMP)
        RETURNING *`,
-      [userId, total]
+      [
+        userId,
+        asMoney(totalDueCents),
+        asMoney(subtotalCents),
+        asMoney(discountCents),
+        coupon?.code || null,
+      ]
     );
     const order = orderResult.rows[0];
     await client.query(
@@ -227,8 +325,27 @@ const createPos = async (userId, items) => {
       }
     }
 
+    await client.query(
+      `INSERT INTO order_payments
+       (order_id, payment_method, amount_due, amount_tendered, change_amount)
+       VALUES ($1, 'cash', $2, $3, $4)`,
+      [order.id, asMoney(totalDueCents), asMoney(tenderedCents), asMoney(changeCents)]
+    );
+    if (coupon) await couponModel.recordRedemption(client, coupon, customerId, order.id);
+    if (customerId) {
+      await couponModel.issueRewardsForCustomer(client, customerId, order.completed_at);
+    }
+
     await client.query('COMMIT');
-    return order;
+    return {
+      ...order,
+      payment: {
+        payment_method: 'cash',
+        amount_due: asMoney(totalDueCents),
+        amount_tendered: asMoney(tenderedCents),
+        change_amount: asMoney(changeCents),
+      },
+    };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -290,6 +407,12 @@ const attachItems = async (orders) => {
       [order.shipment ? order.shipment.id : order.id]
     );
     order.delivery_location = locationResult.rows[0] || null;
+    const paymentResult = await pool.query(
+      `SELECT payment_method, amount_due, amount_tendered, change_amount, collected_at
+       FROM order_payments WHERE order_id = $1`,
+      [order.id]
+    );
+    order.payment = paymentResult.rows[0] || null;
   }
   return orders;
 };

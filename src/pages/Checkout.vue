@@ -50,6 +50,33 @@
           <p class="payment-note">Payment: Cash on delivery</p>
         </div>
 
+        <section class="coupon-form" aria-labelledby="coupon-heading">
+          <h3 id="coupon-heading">Coupon or discount</h3>
+          <label for="checkout-coupon">Coupon code</label>
+          <div class="coupon-entry">
+            <input
+              id="checkout-coupon"
+              v-model="couponCode"
+              type="text"
+              maxlength="64"
+              autocomplete="off"
+              :disabled="loading"
+              @input="clearAppliedCoupon"
+            />
+            <ion-button fill="outline" :disabled="loading || couponLoading || !couponCode.trim()" @click="applyCoupon">
+              {{ couponLoading ? 'Checking...' : 'Apply' }}
+            </ion-button>
+          </div>
+          <p v-if="couponError" class="error-msg" role="alert">{{ couponError }}</p>
+          <p v-else-if="couponCode.trim() && !appliedCoupon" class="zone-status" role="status">
+            Apply this code before placing your order.
+          </p>
+          <p v-if="appliedCoupon" class="coupon-success" role="status">
+            {{ appliedCoupon.campaign_name }} applied: PHP {{ formatPrice(appliedCoupon.discount_amount) }} off.
+            <button type="button" @click="clearAppliedCoupon">Remove</button>
+          </p>
+        </section>
+
         <ion-list>
           <ion-item v-for="item in cart" :key="item.id">
             <ion-label>
@@ -68,6 +95,10 @@
           <span>Delivery fee</span>
           <span>PHP {{ formatPrice(selectedDeliveryFee) }}</span>
         </div>
+        <div v-if="couponDiscount > 0" class="total-row">
+          <span>Discount</span>
+          <span>- PHP {{ formatPrice(couponDiscount) }}</span>
+        </div>
         <div class="total-row grand-total">
           <strong>Total</strong>
           <strong class="price-text">PHP {{ formatPrice(total) }}</strong>
@@ -76,7 +107,7 @@
         <ion-button
           expand="block"
           class="ion-margin-top"
-          :disabled="loading || zonesLoading || !deliveryZoneId || !deliveryZones.length"
+          :disabled="loading || zonesLoading || !deliveryZoneId || !deliveryZones.length || (couponCode.trim() && !appliedCoupon)"
           @click="placeOrder"
         >
           {{ loading ? 'Placing Order...' : 'Place Order' }}
@@ -120,6 +151,7 @@ import {
   clearCart,
   createOrder,
   getDeliveryZones,
+  validateCoupon,
 } from '../services/api';
 
 const router = useRouter();
@@ -135,15 +167,44 @@ const deliveryZoneId = ref('');
 const zonesLoading = ref(true);
 const zoneLoadError = ref('');
 const deliveryOtp = ref('');
+const couponCode = ref('');
+const appliedCoupon = ref(null);
+const couponLoading = ref(false);
+const couponError = ref('');
 
 const itemsTotal = computed(() => getCartTotal());
 const selectedZone = computed(() => deliveryZones.value.find((zone) => String(zone.id) === deliveryZoneId.value));
 const selectedDeliveryFee = computed(() => Number(selectedZone.value?.delivery_fee || 0));
-const total = computed(() => itemsTotal.value + selectedDeliveryFee.value);
+const couponDiscount = computed(() => Number(appliedCoupon.value?.discount_amount || 0));
+const total = computed(() => Math.max(0, itemsTotal.value + selectedDeliveryFee.value - couponDiscount.value));
 const successMessage = computed(() => deliveryOtp.value
   ? `Order placed. Give your rider delivery code ${deliveryOtp.value} when the order arrives.`
   : 'Order placed successfully!');
 const formatPrice = (price) => parseFloat(price).toFixed(2);
+
+const clearAppliedCoupon = () => {
+  appliedCoupon.value = null;
+  couponError.value = '';
+};
+
+const applyCoupon = async () => {
+  couponError.value = '';
+  if (!couponCode.value.trim()) return;
+  couponLoading.value = true;
+  try {
+    const items = cart.value.map((item) => ({
+      product_id: item.id,
+      quantity: item.quantity,
+    }));
+    const response = await validateCoupon(couponCode.value.trim(), items);
+    appliedCoupon.value = response.data;
+  } catch (err) {
+    appliedCoupon.value = null;
+    couponError.value = err.response?.data?.message || 'Could not validate this coupon.';
+  } finally {
+    couponLoading.value = false;
+  }
+};
 
 const placeOrder = async () => {
   error.value = '';
@@ -171,7 +232,8 @@ const placeOrder = async () => {
       deliveryPhone.value.trim(),
       Number(deliveryZoneId.value),
       deliveryInstructions.value.trim(),
-      'cod'
+      'cod',
+      appliedCoupon.value?.code || null
     );
 
     clearCart();
@@ -213,6 +275,9 @@ const onSuccessDismiss = () => {
 onIonViewWillEnter(() => {
   cart.value = getCart();
   error.value = '';
+  couponCode.value = '';
+  appliedCoupon.value = null;
+  couponError.value = '';
   loadDeliveryZones();
 });
 </script>
@@ -264,6 +329,59 @@ ion-button {
   background: #fffafd;
 }
 
+.coupon-form {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid #f3d6e3;
+  border-radius: 16px;
+  background: #fffafd;
+}
+
+.coupon-form h3 {
+  margin: 0 0 0.6rem;
+}
+
+.coupon-form label {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: #5c5c5c;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.coupon-entry {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.coupon-entry input {
+  min-width: 0;
+  flex: 1;
+  padding: 0.75rem;
+  border: 1px solid #e8c8d8;
+  border-radius: 10px;
+  background: #fff;
+  color: #161616;
+  font: inherit;
+}
+
+.coupon-success {
+  margin-bottom: 0;
+  color: #1a7a4c;
+  font-weight: 600;
+}
+
+.coupon-success button {
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: #a51052;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
 .delivery-form h3 {
   margin: 0;
 }
@@ -313,9 +431,19 @@ ion-button {
 
   .delivery-form input,
   .delivery-form textarea,
-  .delivery-form select {
+  .delivery-form select,
+  .coupon-entry input {
     min-height: 44px;
     font-size: 16px;
+  }
+
+  .coupon-entry {
+    flex-direction: column;
+  }
+
+  .coupon-entry ion-button {
+    width: 100%;
+    margin: 0;
   }
 
   .delivery-form textarea {

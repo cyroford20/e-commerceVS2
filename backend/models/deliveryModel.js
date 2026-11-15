@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
+const couponModel = require('./couponModel');
 
 const shipmentCode = () =>
   `SHP-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
@@ -592,10 +593,18 @@ const updateRiderShipment = async (shipmentId, riderId, input) => inTransaction(
   await client.query(`UPDATE shipments SET status = $1,
     rider_user_id = CASE WHEN $1 IN ('rescheduled','return_to_warehouse') THEN NULL ELSE rider_user_id END,
     updated_at = CURRENT_TIMESTAMP WHERE id = $2`, [status, shipmentId]);
-  await client.query(`UPDATE orders SET delivery_status = $1,
+  const completedOrder = await client.query(`UPDATE orders SET delivery_status = $1,
+    completed_at = CASE WHEN $1 = 'delivered' THEN COALESCE(completed_at, CURRENT_TIMESTAMP) ELSE completed_at END,
     delivery_person_id = CASE WHEN $1 IN ('rescheduled','return_to_warehouse') THEN NULL ELSE delivery_person_id END,
     delivery_person = CASE WHEN $1 IN ('rescheduled','return_to_warehouse') THEN NULL ELSE delivery_person END
-    WHERE id = $2`, [status, shipment.order_id]);
+    WHERE id = $2 RETURNING user_id, completed_at`, [status, shipment.order_id]);
+  if (status === 'delivered') {
+    await couponModel.issueRewardsForCustomer(
+      client,
+      completedOrder.rows[0]?.user_id,
+      completedOrder.rows[0]?.completed_at
+    );
+  }
   if (status === 'rescheduled') {
     const replacementOtp = makeOtp();
     await client.query(`UPDATE shipments SET otp_hash = $1,

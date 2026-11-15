@@ -9,6 +9,7 @@ const authRoutes = require('./routes/authRoutes');
 const productRoutes = require('./routes/productRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const deliveryRoutes = require('./routes/deliveryRoutes');
+const couponRoutes = require('./routes/couponRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -97,6 +98,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/delivery', deliveryRoutes);
+app.use('/api/coupons', couponRoutes);
 
 // Health check
 app.get('/', (req, res) => {
@@ -116,6 +118,11 @@ const startServer = async () => {
     'utf8'
   );
   await pool.query(deliverySchema);
+  const couponSchema = fs.readFileSync(
+    path.resolve(__dirname, '../database/coupons_and_payments.sql'),
+    'utf8'
+  );
+  await pool.query(couponSchema);
   await seedPhilippineBarangays();
   app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);

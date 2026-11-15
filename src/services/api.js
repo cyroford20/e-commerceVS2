@@ -61,7 +61,7 @@ export const validateBuild = (build) => api.post('/products/build/validate', bui
 
 // ---------- ORDERS ----------
 
-export const createOrder = (items, deliveryAddress, deliveryPhone, deliveryZoneId, deliveryInstructions = '', paymentMethod = 'cod') => {
+export const createOrder = (items, deliveryAddress, deliveryPhone, deliveryZoneId, deliveryInstructions = '', paymentMethod = 'cod', couponCode = null) => {
   return api.post('/orders', {
     items,
     delivery_address: deliveryAddress,
@@ -69,8 +69,17 @@ export const createOrder = (items, deliveryAddress, deliveryPhone, deliveryZoneI
     delivery_zone_id: deliveryZoneId,
     delivery_instructions: deliveryInstructions,
     payment_method: paymentMethod,
+    coupon_code: couponCode,
   });
 };
+
+export const validateCoupon = (code, items, customerId = null) =>
+  api.post('/coupons/validate', { code, items, customer_id: customerId });
+export const getMyCoupons = () => api.get('/coupons/mine');
+export const getCouponCampaigns = () => api.get('/coupons/admin/campaigns');
+export const createCouponCampaign = (campaign) => api.post('/coupons/admin/campaigns', campaign);
+export const updateCouponCampaign = (id, campaign) =>
+  api.put(`/coupons/admin/campaigns/${id}`, campaign);
 
 export const getDeliveryZones = () => api.get('/delivery/zones');
 export const getAdminDeliveryZones = () => api.get('/delivery/zones', { params: { all: true } });
@@ -120,10 +129,19 @@ export const getShipmentProof = async (shipmentId) => {
   return URL.createObjectURL(response.data);
 };
 
-export const createPosOrder = (items, customerId = null) => {
+export const createPosOrder = (
+  items,
+  customerId = null,
+  amountTendered = null,
+  couponCode = null,
+  manualDiscountAmount = null
+) => {
   return api.post('/orders/pos', {
     items,
     customer_id: customerId || null,
+    amount_tendered: amountTendered,
+    coupon_code: couponCode,
+    manual_discount_amount: manualDiscountAmount,
   });
 };
 

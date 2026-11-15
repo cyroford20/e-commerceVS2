@@ -19,6 +19,7 @@ const createOrder = async (req, res) => {
       delivery_zone_id: deliveryZoneId,
       delivery_instructions: deliveryInstructions,
       payment_method: paymentMethod = 'cod',
+      coupon_code: couponCode = null,
     } = req.body;
     const userId = req.user.id;
 
@@ -52,6 +53,11 @@ const createOrder = async (req, res) => {
     if (paymentMethod !== 'cod') {
       return res.status(400).json({ message: 'Cash on delivery is the available payment method.' });
     }
+    if (couponCode != null && (
+      typeof couponCode !== 'string' || !couponCode.trim() || couponCode.trim().length > 64
+    )) {
+      return res.status(400).json({ message: 'Enter a valid coupon code.' });
+    }
 
     const order = await orderModel.create(
       userId,
@@ -60,7 +66,8 @@ const createOrder = async (req, res) => {
       deliveryPhone.trim(),
       Number(deliveryZoneId),
       typeof deliveryInstructions === 'string' ? deliveryInstructions.trim().slice(0, 1000) : null,
-      paymentMethod
+      paymentMethod,
+      typeof couponCode === 'string' ? couponCode.trim() : null
     );
 
     res.status(201).json({
@@ -78,14 +85,27 @@ const createOrder = async (req, res) => {
 // POST /api/orders/pos  (store owner in-store sale)
 const createPosOrder = async (req, res) => {
   try {
-    const { items, customer_id: customerId } = req.body;
+    const {
+      items,
+      customer_id: customerId,
+      amount_tendered: amountTendered,
+      coupon_code: couponCode,
+      manual_discount_amount: manualDiscountAmount,
+    } = req.body;
 
     if (!Array.isArray(items) || items.length === 0 || items.length > 100) {
       return res.status(400).json({ message: 'Sale must have at least one item.' });
     }
 
+    if (couponCode != null && (
+      typeof couponCode !== 'string' || !couponCode.trim() || couponCode.trim().length > 64
+    )) {
+      return res.status(400).json({ message: 'Enter a valid coupon code.' });
+    }
+
     let userId;
-    if (customerId) {
+    let registeredCustomerId = null;
+    if (customerId !== null && customerId !== undefined && String(customerId).trim() !== '') {
       const id = Number(customerId);
       if (!Number.isSafeInteger(id) || id < 1) {
         return res.status(400).json({ message: 'Selected customer was not found.' });
@@ -95,12 +115,18 @@ const createPosOrder = async (req, res) => {
         return res.status(400).json({ message: 'Selected customer was not found.' });
       }
       userId = customer.id;
+      registeredCustomerId = customer.id;
     } else {
       const walkIn = await userModel.ensureWalkInCustomer();
       userId = walkIn.id;
     }
 
-    const order = await orderModel.createPos(userId, items);
+    const order = await orderModel.createPos(userId, items, {
+      customerId: registeredCustomerId,
+      amountTendered,
+      couponCode: typeof couponCode === 'string' ? couponCode.trim() : null,
+      manualDiscountAmount,
+    });
 
     res.status(201).json({
       message: 'POS sale completed.',

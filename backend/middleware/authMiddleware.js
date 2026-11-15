@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const userModel = require('../models/userModel');
 const jwtSecret = require('../config/jwtSecret');
+const { requireRole } = require('../utils/roleAuthorization');
 
 // Middleware to verify JWT token and load the current account
 const authenticate = async (req, res, next) => {
@@ -27,14 +28,6 @@ const authenticate = async (req, res, next) => {
   } catch (error) {
     return res.status(401).json({ message: 'Invalid or expired token.' });
   }
-};
-
-// Restrict a route to specific account roles. Use after authenticate.
-const requireRole = (...roles) => (req, res, next) => {
-  if (!req.user || !roles.includes(req.user.role)) {
-    return res.status(403).json({ message: 'You do not have access to this action.' });
-  }
-  next();
 };
 
 const requireActiveRider = async (req, res, next) => {

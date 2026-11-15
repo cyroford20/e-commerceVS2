@@ -6,7 +6,7 @@
       </ion-buttons>
 
       <ion-title>
-        <router-link to="/home" class="brand-mark" v-if="!showBack">
+        <router-link :to="brandHome" class="brand-mark" v-if="!showBack">
           <BrandLockup size="compact" />
         </router-link>
         <span v-else class="page-title">{{ title }}</span>
@@ -67,7 +67,7 @@ import {
   personOutline,
   storefrontOutline,
 } from 'ionicons/icons';
-import { isLoggedIn, logout, getCartCount, getRole } from '../services/api';
+import { isLoggedIn, logout, getCartCount, getRole, homeForRole } from '../services/api';
 
 defineProps({
   title: { type: String, default: 'Vape Shop' },
@@ -80,11 +80,14 @@ const router = useRouter();
 const loggedIn = ref(false);
 const cartCount = ref(0);
 const isOwner = ref(false);
+const brandHome = ref('/home');
 
 const refresh = () => {
   loggedIn.value = isLoggedIn();
   cartCount.value = getCartCount();
-  isOwner.value = getRole() === 'store-owner';
+  const role = getRole();
+  isOwner.value = role === 'store-owner';
+  brandHome.value = homeForRole(role);
 };
 
 const handleLogout = () => {
