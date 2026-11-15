@@ -849,13 +849,6 @@ const formatStatus = (status) =>
     .map((word) => word[0].toUpperCase() + word.slice(1))
     .join(' ');
 
-const googleMapsLink = (order) => {
-  const destination = encodeURIComponent(order.delivery_address || '');
-  const location = order.delivery_location;
-  const origin = location ? `&origin=${location.latitude},${location.longitude}` : '';
-  return `https://www.google.com/maps/dir/?api=1&destination=${destination}${origin}`;
-};
-
 const isLocationStale = (location) =>
   Date.now() - new Date(location.recorded_at).getTime() > 120000;
 

@@ -87,10 +87,18 @@
             <div class="rider-info">
               <strong>{{ shipment.rider_name || 'No rider assigned' }}</strong>
               <small v-if="shipment.plate_number">{{ shipment.plate_number }}</small>
-              <a v-if="shipment.latitude != null" :href="mapLink(shipment)" target="_blank" rel="noopener noreferrer">View latest rider location</a>
+              <button v-if="shipment.latitude != null || shipment.delivery_address" class="secondary map-toggle" type="button" @click="mapOpen[shipment.id] = !mapOpen[shipment.id]">
+                {{ mapOpen[shipment.id] ? 'Hide in-app map' : 'View in-app map' }}
+              </button>
               <small v-if="shipment.location_recorded_at">Updated {{ dateTime(shipment.location_recorded_at) }}</small>
               <small v-if="shipment.estimated_delivery_at">ETA {{ dateTime(shipment.estimated_delivery_at) }}</small>
             </div>
+          </div>
+          <div v-if="mapOpen[shipment.id]" class="in-app-map">
+            <LiveDeliveryMap
+              :location="shipment.latitude != null ? { latitude: shipment.latitude, longitude: shipment.longitude } : null"
+              :address="shipment.delivery_address || ''"
+            />
           </div>
           <div v-if="!['delivered','cancelled','return_to_warehouse'].includes(shipment.status)" class="eta-row">
             <label>Estimated delivery <input v-model="etaDraft[shipment.id]" type="datetime-local" /></label>
@@ -212,6 +220,7 @@ import {
   getAdminShipments, getCodSummary, getDeliveryRiders, getDeliveryVehicles,
   remitShipmentCod, updateDeliveryRider, updateDeliveryVehicle, updateDeliveryZone, updateShipmentEta,
 } from '../services/api';
+import LiveDeliveryMap from './LiveDeliveryMap.vue';
 
 const props = defineProps({ active: { type: Boolean, default: true } });
 
@@ -235,6 +244,7 @@ const codRows = ref([]);
 const assignment = reactive({});
 const remittance = reactive({});
 const etaDraft = reactive({});
+const mapOpen = reactive({});
 const busyId = ref(null);
 const search = ref('');
 const statusFilter = ref('');
@@ -280,8 +290,6 @@ const canAssign = (shipment) => ['ready_for_delivery', 'rider_assigned', 'delive
 const assignableRiders = (shipment) => availableRiders.value.filter((rider) =>
   !rider.coverage?.length || !shipment.delivery_zone_id || rider.coverage.some((zone) => zone.id === shipment.delivery_zone_id)
 );
-const mapLink = (shipment) => `https://www.openstreetmap.org/?mlat=${shipment.latitude}&mlon=${shipment.longitude}#map=16/${shipment.latitude}/${shipment.longitude}`;
-
 const loadAll = async () => {
   loading.value = shipments.value.length === 0;
   error.value = '';

@@ -36,9 +36,16 @@
               <span>{{ shipment.delivery_address }}</span>
               <span v-if="shipment.delivery_instructions">Instructions: {{ shipment.delivery_instructions }}</span>
               <a :href="`tel:${shipment.delivery_phone}`">{{ shipment.delivery_phone }}</a>
-              <a :href="`https://www.openstreetmap.org/search?query=${encodeURIComponent(shipment.delivery_address || '')}`" target="_blank" rel="noopener noreferrer">Open destination map</a>
-              <a v-if="shipment.latitude != null" :href="mapLink(shipment)" target="_blank" rel="noopener noreferrer">View my latest location</a>
+              <button v-if="shipment.delivery_address || shipment.latitude != null" type="button" class="secondary" @click="mapOpen[shipment.id] = !mapOpen[shipment.id]">
+                {{ mapOpen[shipment.id] ? 'Hide in-app map' : 'View in-app map' }}
+              </button>
               <small v-if="shipment.location_recorded_at">GPS updated {{ dateTime(shipment.location_recorded_at) }}<span v-if="isLocationStale(shipment.location_recorded_at)"> · stale</span></small>
+            </div>
+            <div v-if="mapOpen[shipment.id]" class="in-app-map">
+              <LiveDeliveryMap
+                :location="shipment.latitude != null ? { latitude: shipment.latitude, longitude: shipment.longitude } : null"
+                :address="shipment.delivery_address || ''"
+              />
             </div>
 
             <div class="workflow-actions" v-if="shipment.is_current_assignment && !['delivered', 'cancelled', 'return_to_warehouse', 'rescheduled'].includes(shipment.status)">
@@ -104,6 +111,7 @@
 import { computed, onBeforeUnmount, reactive, ref } from 'vue';
 import { IonPage, IonContent, onIonViewWillEnter, onIonViewWillLeave } from '@ionic/vue';
 import Navbar from '../components/Navbar.vue';
+import LiveDeliveryMap from '../components/LiveDeliveryMap.vue';
 import {
   acceptShipment, getDeliveryNotifications, getRiderShipments, getShipmentProof,
   markDeliveryNotificationRead, updateRiderShipment, updateShipmentLocation,
@@ -122,6 +130,7 @@ const failureShipmentId = ref(null);
 const proof = reactive({ otp: '', recipient_name: '', actual_cod: '', confirmed: false, photo: null });
 const failure = reactive({ reason: '', note: '' });
 const rescheduleAt = reactive({});
+const mapOpen = reactive({});
 const watchIds = new Map();
 const lastLocationSent = new Map();
 let refreshTimer;
@@ -132,8 +141,6 @@ const label = (value = '') => String(value || 'unknown').split('_').map((part) =
 const money = (value) => Number(value || 0).toFixed(2);
 const dateTime = (date) => new Date(date).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
 const isLocationStale = (date) => Date.now() - new Date(date).getTime() > 120000;
-const mapLink = (shipment) => `https://www.openstreetmap.org/?mlat=${shipment.latitude}&mlon=${shipment.longitude}#map=16/${shipment.latitude}/${shipment.longitude}`;
-
 const loadProofPhotos = async () => Promise.all(shipments.value
   .filter((shipment) => shipment.photo_filename && !shipment.proof_photo_url)
   .map(async (shipment) => {

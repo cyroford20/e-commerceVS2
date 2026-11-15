@@ -54,11 +54,9 @@
               </div>
             </div>
           </div>
-          <LiveDeliveryMap
-            v-if="isTrackable(order)"
-            :location="order.delivery_location"
-            :address="order.delivery_address"
-          />
+          <div v-if="isTrackable(order) || mapOpen[order.id]" :id="`delivery-map-${order.id}`">
+            <LiveDeliveryMap :location="order.delivery_location" :address="order.delivery_address" />
+          </div>
           <div v-if="order.delivery_address" class="delivery-details">
             <strong>Delivery</strong>
             <span v-if="order.shipment?.estimated_delivery_at">Estimated arrival: {{ formatDate(order.shipment.estimated_delivery_at) }}</span>
@@ -66,22 +64,9 @@
             <span>{{ order.delivery_address }}</span>
             <span v-if="order.delivery_instructions">Instructions: {{ order.delivery_instructions }}</span>
             <span>{{ order.delivery_phone }}</span>
-            <a
-              :href="destinationMapLink(order)"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open delivery address in Google Maps
-            </a>
-            <a
-              v-if="order.delivery_location && isTrackable(order)"
-              :href="googleMapsLink(order)"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="tracking-link"
-            >
-              Track courier location in Google Maps
-            </a>
+            <button type="button" class="tracking-link" @click="openDeliveryMap(order)">
+              {{ isTrackable(order) ? 'View in-app delivery map' : 'Show delivery map' }}
+            </button>
             <small v-if="order.delivery_location && isTrackable(order)">
               Courier location updated {{ formatDate(order.delivery_location.recorded_at) }}
               <span v-if="isLocationStale(order.delivery_location)" class="stale-label">
@@ -145,6 +130,7 @@ const orders = ref([]);
 const loading = ref(true);
 const error = ref('');
 const notifications = ref([]);
+const mapOpen = ref({});
 let refreshTimer;
 const activeDeliveries = computed(() =>
   orders.value.filter((order) => ['picked_up', 'out_for_delivery'].includes(order.delivery_status))
@@ -171,17 +157,12 @@ const formatStatus = (status) =>
     .map((word) => word[0].toUpperCase() + word.slice(1))
     .join(' ');
 
-const googleMapsLink = (order) => {
-  const destination = encodeURIComponent(order.delivery_address || '');
-  const location = order.delivery_location;
-  const origin = location ? `&origin=${location.latitude},${location.longitude}` : '';
-  return `https://www.google.com/maps/dir/?api=1&destination=${destination}${origin}`;
+const openDeliveryMap = (order) => {
+  mapOpen.value[order.id] = true;
+  window.setTimeout(() => document.getElementById(`delivery-map-${order.id}`)?.scrollIntoView({
+    behavior: 'smooth', block: 'center',
+  }), 0);
 };
-
-const destinationMapLink = (order) =>
-  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-    order.delivery_address || ''
-  )}`;
 
 const isTrackable = (order) =>
   ['rider_assigned', 'accepted_by_rider', 'picked_up', 'out_for_delivery', 'delivery_failed', 'rescheduled'].includes(order.delivery_status);

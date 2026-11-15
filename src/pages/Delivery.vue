@@ -39,19 +39,16 @@
               <strong>Deliver to</strong>
               <span>{{ order.delivery_address || 'No address provided' }}</span>
               <span>{{ order.delivery_phone || 'No phone number' }}</span>
-              <a
-                v-if="order.delivery_address"
-                :href="googleMapsLink(order)"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="map-link"
-              >
-                Open route in Google Maps
-              </a>
+              <button v-if="order.delivery_address || order.delivery_location" type="button" class="secondary-btn" @click="mapOpen[order.id] = !mapOpen[order.id]">
+                {{ mapOpen[order.id] ? 'Hide in-app map' : 'View in-app map' }}
+              </button>
               <small v-if="order.delivery_location">
                 Location updated {{ formatDate(order.delivery_location.recorded_at) }}
                 <span v-if="isLocationStale(order.delivery_location)" class="stale-label"> · Stale</span>
               </small>
+            </div>
+            <div v-if="mapOpen[order.id]" class="in-app-map">
+              <LiveDeliveryMap :location="order.delivery_location" :address="order.delivery_address || ''" />
             </div>
             <div class="actions">
               <span class="status">{{ formatStatus(order.delivery_status) }}</span>
@@ -129,6 +126,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { IonPage, IonContent } from '@ionic/vue';
 import Navbar from '../components/Navbar.vue';
+import LiveDeliveryMap from '../components/LiveDeliveryMap.vue';
 import {
   getAssignedDeliveries,
   updateAssignedDelivery,
@@ -147,6 +145,7 @@ const proofConfirmed = ref(false);
 const proofPhoto = ref(null);
 const locationMessage = ref('');
 const locationConsent = ref(false);
+const mapOpen = ref({});
 const watchIds = new Map();
 const lastLocationSent = new Map();
 let refreshTimer;
@@ -166,15 +165,6 @@ const analytics = computed(() => {
     ).length,
   };
 });
-
-const googleMapsLink = (order) => {
-  const location = order.delivery_location;
-  const destination = encodeURIComponent(order.delivery_address || '');
-  const origin = location
-    ? `&origin=${location.latitude},${location.longitude}`
-    : '';
-  return `https://www.google.com/maps/dir/?api=1&destination=${destination}${origin}`;
-};
 
 const sendLocation = (order, position) => {
   const now = Date.now();
