@@ -9,7 +9,7 @@
         <div class="scanner-camera-window">
           <video ref="videoElement" class="scanner-video" autoplay muted playsinline></video>
           <div class="scanner-frame" aria-hidden="true"></div>
-          <span v-if="!cameraReady" class="scanner-loading">Starting camera…</span>
+          <span v-if="!cameraReady" class="scanner-loading">Starting camera...</span>
         </div>
         <h2>Scan barcode</h2>
         <p>Camera access is used only to scan a product barcode. Point the rear camera at the barcode.</p>
@@ -17,14 +17,20 @@
       </div>
     </div>
 
-    <p v-if="errorMessage" class="scanner-error">{{ errorMessage }}</p>
+    <Teleport to="body">
+      <p v-if="errorMessage" class="scanner-error">{{ errorMessage }}</p>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { BarcodeDetector as BarcodeDetectorPonyfill } from 'barcode-detector/ponyfill';
+import {
+  BarcodeDetector as BarcodeDetectorPonyfill,
+  prepareZXingModule,
+} from 'barcode-detector/ponyfill';
+import readerWasmUrl from 'zxing-wasm/reader/zxing_reader.wasm?url';
 
 defineProps({
   label: { type: String, default: 'Scan barcode' },
@@ -41,8 +47,19 @@ let scanHandled = false;
 let scannerSession = 0;
 let cameraStream;
 let detectionTimer;
+let decoderReady;
 
 const barcodeFormats = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'];
+
+const prepareDecoder = () => {
+  decoderReady ??= prepareZXingModule({
+    overrides: {
+      locateFile: (path, prefix) => path.endsWith('.wasm') ? readerWasmUrl : `${prefix}${path}`,
+    },
+    fireImmediately: true,
+  });
+  return decoderReady;
+};
 
 const cleanup = () => {
   scannerSession += 1;
@@ -82,14 +99,23 @@ const finishScan = (value) => {
   emit('scanned', value);
 };
 
-const scanVideo = async (session, detector, video, detectorState) => {
+const scanVideo = async (session, detector, video, detectorState, canvas, context) => {
   if (session !== scannerSession || !scanning.value || scanHandled) return;
 
   if (!detectorState.inProgress && video.readyState >= 2) {
     detectorState.inProgress = true;
     try {
-      const results = await detector.detect(video);
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+      if (!width || !height) throw new Error('The camera has not produced a frame yet.');
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      context.drawImage(video, 0, 0, width, height);
+      const results = await detector.detect(canvas);
       if (session !== scannerSession) return;
+      detectorState.consecutiveErrors = 0;
       const value = results.find((item) => item.rawValue?.trim())?.rawValue?.trim();
       if (value) {
         await finishScan(value);
@@ -97,9 +123,13 @@ const scanVideo = async (session, detector, video, detectorState) => {
       }
     } catch (error) {
       if (session === scannerSession) {
-        errorMessage.value = 'Barcode detection failed. Close the scanner and try again.';
-        cleanup();
-        return;
+        detectorState.consecutiveErrors += 1;
+        console.warn('Barcode frame decode failed:', error);
+        if (detectorState.consecutiveErrors >= 8) {
+          errorMessage.value = `Camera is on, but barcode decoding failed: ${error?.message || 'unsupported camera frame'}`;
+          cleanup();
+          return;
+        }
       }
     } finally {
       detectorState.inProgress = false;
@@ -107,7 +137,7 @@ const scanVideo = async (session, detector, video, detectorState) => {
   }
 
   if (session === scannerSession && scanning.value) {
-    detectionTimer = window.setTimeout(() => scanVideo(session, detector, video, detectorState), 180);
+    detectionTimer = window.setTimeout(() => scanVideo(session, detector, video, detectorState, canvas, context), 200);
   }
 };
 
@@ -150,9 +180,15 @@ const startScanner = async () => {
     await video.play();
     if (session !== scannerSession) return;
 
+    await prepareDecoder();
+    if (session !== scannerSession) return;
+
     const detector = new BarcodeDetectorPonyfill({ formats: barcodeFormats });
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) throw new Error('Barcode camera preview is unavailable on this device.');
     cameraReady.value = true;
-    scanVideo(session, detector, video, { inProgress: false });
+    scanVideo(session, detector, video, { inProgress: false, consecutiveErrors: 0 }, canvas, context);
   } catch (error) {
     const stillActive = session === scannerSession;
     cleanup();
@@ -195,9 +231,24 @@ watch(() => route.fullPath, () => {
 }
 
 .scanner-error {
-  margin: 0;
-  color: #d4146a;
-  font-size: 0.8rem;
+  position: fixed;
+  z-index: 12000;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  left: max(1rem, env(safe-area-inset-left));
+  width: fit-content;
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: .8rem 1rem;
+  border: 1px solid #f3d6e3;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, .2);
+  color: #a51052;
+  font-size: .9rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
 }
 
 .barcode-scanner-overlay {
@@ -223,8 +274,8 @@ watch(() => route.fullPath, () => {
 
 .scanner-camera-window {
   position: relative;
-  width: 220px;
-  height: 140px;
+  width: min(76vw, 400px);
+  height: min(54vw, 250px);
   overflow: hidden;
   border-radius: 14px;
   background: #000;
