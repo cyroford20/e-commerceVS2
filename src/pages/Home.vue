@@ -135,6 +135,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { onIonViewWillEnter } from '@ionic/vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent, IonSearchbar, IonSpinner, IonButton } from '@ionic/vue';
 import Navbar from '../components/Navbar.vue';
@@ -239,9 +240,12 @@ const resetHeroPointer = () => {
 };
 
 onMounted(() => {
-  loggedIn.value = isLoggedIn();
   fetchProducts();
-  if (navbar.value) navbar.value.refresh();
+});
+
+onIonViewWillEnter(() => {
+  loggedIn.value = isLoggedIn();
+  navbar.value?.refresh();
 });
 </script>
 

@@ -39,8 +39,13 @@
             Delivery instructions (optional)
             <textarea v-model="deliveryInstructions" rows="2" maxlength="1000" placeholder="Gate, landmark, or drop-off details"></textarea>
           </label>
-          <p v-if="!zonesLoading && deliveryZones.length === 0" class="error-msg">
-            Delivery zones are not set up yet. Contact the store before placing an order.
+          <p v-if="zonesLoading" class="zone-status" role="status">Loading delivery areas...</p>
+          <div v-else-if="zoneLoadError" class="error-msg" role="alert">
+            <p>{{ zoneLoadError }}</p>
+            <button type="button" class="retry-zones" @click="loadDeliveryZones">Retry loading zones</button>
+          </div>
+          <p v-else-if="deliveryZones.length === 0" class="error-msg" role="alert">
+            The store has not configured any active delivery barangays yet, so orders are temporarily unavailable. The store owner must add a barangay and delivery fee under Store &gt; Delivery &gt; Zones &amp; fees.
           </p>
           <p class="payment-note">Payment: Cash on delivery</p>
         </div>
@@ -94,7 +99,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
+import { onIonViewWillEnter } from '@ionic/vue';
 import { useRouter } from 'vue-router';
 import {
   IonPage,
@@ -127,6 +133,7 @@ const deliveryInstructions = ref('');
 const deliveryZones = ref([]);
 const deliveryZoneId = ref('');
 const zonesLoading = ref(true);
+const zoneLoadError = ref('');
 const deliveryOtp = ref('');
 
 const itemsTotal = computed(() => getCartTotal());
@@ -179,21 +186,34 @@ const placeOrder = async () => {
   }
 };
 
+const loadDeliveryZones = async () => {
+  zonesLoading.value = true;
+  zoneLoadError.value = '';
+  try {
+    const response = await getDeliveryZones();
+    deliveryZones.value = Array.isArray(response.data) ? response.data : [];
+    if (!deliveryZones.value.some((zone) => String(zone.id) === deliveryZoneId.value)) {
+      deliveryZoneId.value = '';
+    }
+  } catch (err) {
+    deliveryZones.value = [];
+    zoneLoadError.value = err.response?.data?.message || (err.response
+      ? 'Could not load delivery areas. Please try again.'
+      : 'Could not reach the store. Check your internet connection and try again.');
+  } finally {
+    zonesLoading.value = false;
+  }
+};
+
 const onSuccessDismiss = () => {
   successToast.value = false;
   router.push('/orders');
 };
 
-onMounted(async () => {
+onIonViewWillEnter(() => {
   cart.value = getCart();
-  try {
-    const response = await getDeliveryZones();
-    deliveryZones.value = response.data;
-  } catch (err) {
-    error.value = err.response?.data?.message || 'Could not load delivery zones.';
-  } finally {
-    zonesLoading.value = false;
-  }
+  error.value = '';
+  loadDeliveryZones();
 });
 </script>
 
@@ -246,6 +266,23 @@ ion-button {
 
 .delivery-form h3 {
   margin: 0;
+}
+
+.zone-status {
+  margin: 0;
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.retry-zones {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #a51052;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .delivery-form label {

@@ -175,6 +175,9 @@
           <input v-model="zoneForm.delivery_fee" required type="number" min="0" step="0.01" placeholder="Fee (PHP)" />
           <button class="primary" :disabled="saving">Add zone</button>
         </form>
+        <p v-if="zones.length === 0" class="form-hint" role="status">
+          No delivery zones are configured. Add each barangay the store serves and its delivery fee; checkout stays unavailable until an active zone exists.
+        </p>
         <div class="zone-list">
           <article v-for="zone in zones" :key="zone.id" class="zone-row">
             <div class="zone-edit"><input v-model="zone.name" aria-label="Zone name" /><input v-model="zone.city" aria-label="Zone city" /><input v-model="zone.barangay" aria-label="Zone barangay" /></div>
