@@ -7,7 +7,7 @@
 
       <ion-title>
         <router-link to="/home" class="brand-mark" v-if="!showBack">
-          <img src="/logo.svg" alt="VapeShop" class="brand-logo" />
+          <img src="/logo.svg" alt="Black Elite Vape Store" class="brand-logo" />
         </router-link>
         <span v-else class="page-title">{{ title }}</span>
       </ion-title>

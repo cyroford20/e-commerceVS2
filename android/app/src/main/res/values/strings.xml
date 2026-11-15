@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Vape Shop</string>
-    <string name="title_activity_main">Vape Shop</string>
+    <string name="app_name">Black Elite</string>
+    <string name="title_activity_main">Black Elite</string>
     <string name="package_name">com.vapeshop.app</string>
     <string name="custom_url_scheme">com.vapeshop.app</string>
 </resources>

@@ -10,7 +10,7 @@
           <div class="orb orb-b"></div>
           <div class="veil"></div>
           <div class="visual-copy">
-            <p class="visual-brand"><img src="/logo.svg" alt="VapeShop" /></p>
+            <p class="visual-brand"><img src="/logo.svg" alt="Black Elite Vape Store" /></p>
             <p class="visual-line">Sign in. Stay sharp.</p>
           </div>
         </aside>

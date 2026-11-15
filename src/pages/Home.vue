@@ -23,7 +23,7 @@
 
         <div class="hero-copy">
           <p class="brand rise-in">
-            <img src="/logo.svg" alt="VapeShop" class="hero-logo" />
+            <img src="/logo.svg" alt="Black Elite Vape Store" class="hero-logo" />
           </p>
           <div class="rule rise-in rise-in-delay-1"></div>
           <h1 class="rise-in rise-in-delay-1">Flavor, cut sharp.</h1>

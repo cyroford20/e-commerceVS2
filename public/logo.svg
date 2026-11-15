@@ -1,32 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 160" role="img" aria-labelledby="title desc">
-  <title id="title">VapeShop device logo</title>
-  <desc id="desc">A realistic neon vape device icon.</desc>
-  <defs>
-    <linearGradient id="body" x1="35" y1="30" x2="125" y2="145" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#34343a"/>
-      <stop offset=".5" stop-color="#111116"/>
-      <stop offset="1" stop-color="#050506"/>
-    </linearGradient>
-    <linearGradient id="pink" x1="35" y1="0" x2="125" y2="0">
-      <stop stop-color="#d4146a"/>
-      <stop offset=".5" stop-color="#ff4d8d"/>
-      <stop offset="1" stop-color="#ffb5d0"/>
-    </linearGradient>
-    <filter id="glow" x="-35%" y="-35%" width="170%" height="170%">
-      <feGaussianBlur stdDeviation="4" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-  </defs>
-  <rect width="160" height="160" rx="40" fill="#050505"/>
-  <path d="M66 42V23c0-10 7-18 15-18s15 8 15 18v19" fill="#1b1b20" stroke="#ffb5d0" stroke-width="4"/>
-  <rect x="36" y="35" width="90" height="103" rx="18" fill="url(#body)" stroke="#4b4b55" stroke-width="3"/>
-  <rect x="45" y="46" width="72" height="75" rx="10" fill="#09090d" stroke="#272731" stroke-width="2"/>
-  <rect x="55" y="57" width="52" height="27" rx="5" fill="#17171d"/>
-  <rect x="61" y="63" width="40" height="4" rx="2" fill="#ff4d8d"/>
-  <rect x="61" y="72" width="27" height="4" rx="2" fill="#ffb5d0"/>
-  <circle cx="101" cy="99" r="5" fill="#ff4d8d" filter="url(#glow)"/>
-  <path d="M47 125h68" stroke="url(#pink)" stroke-width="5" stroke-linecap="round"/>
-  <path d="M43 40h76" stroke="#ff4d8d" stroke-width="3" opacity=".8"/>
-  <text x="190" y="101" fill="#ffffff" font-family="Arial, sans-serif" font-size="54" font-weight="800" letter-spacing="1">Vape<tspan fill="#ff4d8d">Shop</tspan></text>
-  <text x="194" y="129" fill="#ffb5d0" font-family="Arial, sans-serif" font-size="13" font-weight="700" letter-spacing="5">VAPE DEVICE</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 160" role="img" aria-labelledby="title desc">
+  <title id="title">Black Elite Vape Store</title>
+  <desc id="desc">Black Elite premium vape shop logo.</desc>
+  <image href="/logo-app.svg" x="0" y="0" width="160" height="160"/>
+  <text x="184" y="83" fill="#ffffff" font-family="Arial,sans-serif" font-size="48" font-weight="900" letter-spacing="1">BLACK ELITE</text>
+  <path d="M188 101h370" stroke="url(#neon)" stroke-width="4" stroke-linecap="round"/>
+  <text x="190" y="132" fill="#cdd1df" font-family="Arial,sans-serif" font-size="17" font-weight="700" letter-spacing="7">VAPE STORE</text>
+  <defs><linearGradient id="neon"><stop stop-color="#ed20ff"/><stop offset=".5" stop-color="#7d42ff"/><stop offset="1" stop-color="#00eaff"/></linearGradient></defs>
 </svg>
