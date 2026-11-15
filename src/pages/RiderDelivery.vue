@@ -18,17 +18,74 @@
           </button>
         </section>
         <div v-if="loading" class="empty">Loading shipments…</div>
-        <div v-else-if="!shipments.length" class="empty"><h2>No assigned shipments</h2><p>New dispatches will appear here.</p></div>
+        <section v-else class="rider-workspace">
+          <nav class="rider-tabs" role="tablist" aria-label="Rider dashboard sections">
+            <button
+              id="deliveries-tab"
+              type="button"
+              role="tab"
+              :aria-selected="activeTab === 'deliveries'"
+              aria-controls="deliveries-panel"
+              :class="{ selected: activeTab === 'deliveries' }"
+              @click="activeTab = 'deliveries'"
+            >
+              To deliver <span>{{ currentDeliveries.length }}</span>
+            </button>
+            <button
+              id="map-tab"
+              type="button"
+              role="tab"
+              :aria-selected="activeTab === 'map'"
+              aria-controls="map-panel"
+              :class="{ selected: activeTab === 'map' }"
+              @click="activeTab = 'map'"
+            >
+              Map <span>{{ mapShipments.length }}</span>
+            </button>
+            <button
+              id="completed-tab"
+              type="button"
+              role="tab"
+              :aria-selected="activeTab === 'completed'"
+              aria-controls="completed-panel"
+              :class="{ selected: activeTab === 'completed' }"
+              @click="activeTab = 'completed'"
+            >
+              Completed <span>{{ completedDeliveries.length }}</span>
+            </button>
+          </nav>
+          <div class="refresh-row">
+            <button
+              class="refresh"
+              type="button"
+              :disabled="refreshing"
+              :aria-label="refreshing ? 'Refreshing shipments' : 'Refresh shipments'"
+              @click="refreshShipments(true)"
+            >
+              <span v-if="refreshing" class="refresh-spinner" aria-hidden="true"></span>
+              <span>{{ refreshing ? 'Refreshing…' : 'Refresh' }}</span>
+            </button>
+          </div>
 
-        <section v-else class="shipment-list">
-          <article v-for="shipment in shipments" :key="shipment.id" class="shipment-card">
+          <section
+            v-if="activeTab === 'deliveries'"
+            id="deliveries-panel"
+            class="tab-panel"
+            role="tabpanel"
+            aria-labelledby="deliveries-tab"
+          >
+            <div v-if="!currentDeliveries.length" class="empty">
+              <h2>No deliveries to complete</h2>
+              <p>New assignments will appear in this tab.</p>
+            </div>
+            <section v-else class="shipment-list">
+          <article v-for="shipment in currentDeliveries" :key="shipment.id" class="shipment-card">
             <header class="shipment-head">
               <div><span class="shipment-code">{{ shipment.shipment_code }}</span><span class="status-pill">{{ label(shipment.status) }}</span>
                 <h2>Order #{{ shipment.order_id }} · {{ shipment.customer_name }}</h2>
                 <p>Order value PHP {{ money(shipment.order_total) }}<template v-if="shipment.payment_method === 'cod'"> · Collect PHP {{ money(shipment.expected_cod) }}</template></p>
               <small v-if="shipment.estimated_delivery_at">Estimated delivery {{ dateTime(shipment.estimated_delivery_at) }}</small>
               </div>
-              <button class="refresh" :disabled="savingId === shipment.id" @click="refreshShipments">Refresh</button>
             </header>
 
             <ol
@@ -59,24 +116,7 @@
               <span>{{ shipment.delivery_address }}</span>
               <span v-if="shipment.delivery_instructions">Instructions: {{ shipment.delivery_instructions }}</span>
               <a :href="`tel:${shipment.delivery_phone}`">{{ shipment.delivery_phone }}</a>
-              <a
-                v-if="shipment.delivery_address"
-                class="secondary navigation-link"
-                :href="navigationUrl(shipment.delivery_address)"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Open navigation (shares address with Google Maps when opened)
-              </a>
-              <button v-if="shipment.delivery_address || shipment.latitude != null" type="button" class="secondary" @click="mapOpen[shipment.id] = !mapOpen[shipment.id]">
-                {{ mapOpen[shipment.id] ? 'Hide in-app map' : 'View in-app map' }}
-              </button>
               <small v-if="shipment.location_recorded_at">GPS updated {{ dateTime(shipment.location_recorded_at) }}<span v-if="isLocationStale(shipment.location_recorded_at)"> · stale</span></small>
-            </div>
-            <div v-if="mapOpen[shipment.id]" class="in-app-map">
-              <LiveDeliveryMap
-                :location="shipment.latitude != null ? { latitude: shipment.latitude, longitude: shipment.longitude } : null"
-              />
             </div>
 
             <div class="workflow-actions" v-if="shipment.is_current_assignment && !['delivered', 'cancelled', 'return_to_warehouse', 'rescheduled'].includes(shipment.status)">
@@ -143,6 +183,100 @@
             </details>
             <img v-if="shipment.proof_photo_url" :src="shipment.proof_photo_url" alt="Proof of delivery" class="proof-photo" />
           </article>
+            </section>
+          </section>
+
+          <section
+            v-else-if="activeTab === 'map'"
+            id="map-panel"
+            class="tab-panel"
+            role="tabpanel"
+            aria-labelledby="map-tab"
+          >
+            <div v-if="activeRouteShipment" class="active-route-map">
+              <h2>Current rider location</h2>
+              <p>The map shows your shared GPS location. Each delivery address is listed below; tap its navigation link to open the destination in Google Maps.</p>
+              <small v-if="activeRouteShipment.location_recorded_at">
+                GPS updated {{ dateTime(activeRouteShipment.location_recorded_at) }}
+                <span v-if="isLocationStale(activeRouteShipment.location_recorded_at)"> · stale</span>
+              </small>
+              <LiveDeliveryMap
+                :location="activeRouteShipment.latitude != null
+                  ? { latitude: activeRouteShipment.latitude, longitude: activeRouteShipment.longitude }
+                  : null"
+              />
+            </div>
+            <div v-if="!mapShipments.length" class="empty">
+              <h2>No delivery destinations</h2>
+              <p>Current assigned addresses will appear here for quick reference.</p>
+            </div>
+            <section v-else class="map-reference-list" aria-label="Delivery destinations">
+              <article v-for="shipment in mapShipments" :key="shipment.id" class="map-reference-card">
+                <header class="shipment-head">
+                  <div>
+                    <span class="shipment-code">{{ shipment.shipment_code }}</span>
+                    <span class="status-pill">{{ label(shipment.status) }}</span>
+                    <h2>Order #{{ shipment.order_id }} · {{ shipment.customer_name }}</h2>
+                  </div>
+                  <strong v-if="shipment.payment_method === 'cod'">COD PHP {{ money(shipment.expected_cod) }}</strong>
+                </header>
+                <div class="address-block">
+                  <strong>Delivery destination</strong>
+                  <span>{{ shipment.delivery_address }}</span>
+                  <span v-if="shipment.delivery_instructions">Instructions: {{ shipment.delivery_instructions }}</span>
+                  <a :href="`tel:${shipment.delivery_phone}`">{{ shipment.delivery_phone }}</a>
+                </div>
+                <a
+                  v-if="shipment.delivery_address"
+                  class="primary navigation-link"
+                  :href="navigationUrl(shipment.delivery_address)"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open destination in Google Maps
+                </a>
+              </article>
+            </section>
+          </section>
+
+          <section
+            v-else
+            id="completed-panel"
+            class="tab-panel"
+            role="tabpanel"
+            aria-labelledby="completed-tab"
+          >
+            <div v-if="!completedDeliveries.length" class="empty">
+              <h2>No completed deliveries yet</h2>
+              <p>Delivered orders and handover details will appear here.</p>
+            </div>
+            <section v-else class="shipment-list">
+              <article v-for="shipment in completedDeliveries" :key="shipment.id" class="shipment-card completed-card">
+                <header class="shipment-head">
+                  <div>
+                    <span class="shipment-code">{{ shipment.shipment_code }}</span>
+                    <span class="status-pill">Delivered</span>
+                    <h2>Order #{{ shipment.order_id }} · {{ shipment.customer_name }}</h2>
+                    <small v-if="completionEvent(shipment)">Completed {{ dateTime(completionEvent(shipment).created_at) }}</small>
+                  </div>
+                  <strong>PHP {{ money(shipment.order_total) }}</strong>
+                </header>
+                <div class="address-block">
+                  <strong>Delivered to</strong>
+                  <span>{{ shipment.delivery_address }}</span>
+                  <span v-if="shipment.payment_method === 'cod'">COD collected: PHP {{ money(shipment.actual_cod) }}</span>
+                </div>
+                <details class="history" v-if="shipment.history?.length">
+                  <summary>Delivery history ({{ shipment.history.length }})</summary>
+                  <div v-for="event in shipment.history" :key="event.id" class="history-item">
+                    <span class="timeline-dot"></span>
+                    <div><b>{{ label(event.status) }}</b><small>{{ event.note }} · {{ dateTime(event.created_at) }}</small></div>
+                  </div>
+                </details>
+                <img v-if="shipment.proof_photo_url" :src="shipment.proof_photo_url" alt="Proof of delivery" class="proof-photo" />
+              </article>
+            </section>
+          </section>
         </section>
 
         <section class="stats" aria-label="Delivery performance">
@@ -174,6 +308,7 @@ import {
 const shipments = ref([]);
 const notifications = ref([]);
 const loading = ref(true);
+const refreshing = ref(false);
 const savingId = ref(null);
 const error = ref('');
 const message = ref('');
@@ -184,10 +319,20 @@ const failureShipmentId = ref(null);
 const proof = reactive({ otp: '', recipient_name: '', actual_cod: '', confirmed: false, photo: null });
 const failure = reactive({ reason: '', note: '' });
 const rescheduleAt = reactive({});
-const mapOpen = reactive({});
+const activeTab = ref('deliveries');
 let refreshTimer;
 let riderPageActive = false;
+let refreshInProgress = null;
 const unreadNotifications = computed(() => notifications.value.filter((item) => !item.read_at));
+const currentDeliveries = computed(() => shipments.value.filter((shipment) =>
+  shipment.is_current_assignment &&
+  ['rider_assigned', 'accepted_by_rider', 'picked_up', 'out_for_delivery', 'delivery_failed'].includes(shipment.status)
+));
+const mapShipments = computed(() => currentDeliveries.value);
+const completedDeliveries = computed(() => shipments.value.filter((shipment) => shipment.status === 'delivered'));
+const activeRouteShipment = computed(() =>
+  currentDeliveries.value.find((shipment) => shipment.status === 'out_for_delivery') || null
+);
 const backgroundLocationSupported = Capacitor.isNativePlatform();
 const riderProgressSteps = ['Assignment', 'Picked up', 'On the way', 'Delivered'];
 
@@ -195,6 +340,8 @@ const label = (value = '') => String(value || 'unknown').split('_').map((part) =
 const money = (value) => Number(value || 0).toFixed(2);
 const dateTime = (date) => new Date(date).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
 const isLocationStale = (date) => Date.now() - new Date(date).getTime() > 120000;
+const completionEvent = (shipment) =>
+  [...(shipment.history || [])].reverse().find((event) => event.status === 'delivered');
 const navigationUrl = (address) =>
   `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
 const riderProgressIndex = (shipment) => ({
@@ -244,20 +391,31 @@ const loadProofPhotos = async () => Promise.all(shipments.value
     catch { shipment.proof_photo_url = ''; }
   }));
 
-const refreshShipments = async () => {
-  try {
-    const [shipmentResponse, notificationResponse] = await Promise.all([
-      getRiderShipments(), getDeliveryNotifications(),
-    ]);
-    shipments.value = shipmentResponse.data;
-    notifications.value = notificationResponse.data;
-    await loadProofPhotos();
-    syncLocationSharing();
-  } catch (err) {
-    error.value = err.response?.data?.message || 'Could not refresh shipments.';
-  } finally {
-    loading.value = false;
+const refreshShipments = (showIndicator = false) => {
+  if (refreshInProgress) {
+    if (showIndicator) refreshing.value = true;
+    return refreshInProgress;
   }
+  refreshing.value = showIndicator;
+  refreshInProgress = (async () => {
+    error.value = '';
+    try {
+      const [shipmentResponse, notificationResponse] = await Promise.all([
+        getRiderShipments(), getDeliveryNotifications(),
+      ]);
+      shipments.value = shipmentResponse.data;
+      notifications.value = notificationResponse.data;
+      await loadProofPhotos();
+      syncLocationSharing();
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Could not refresh shipments.';
+    } finally {
+      loading.value = false;
+      refreshing.value = false;
+      refreshInProgress = null;
+    }
+  })();
+  return refreshInProgress;
 };
 
 const stopSharing = async (shipmentId) => {
@@ -329,6 +487,7 @@ const submitProof = async (shipment) => {
     proof_photo: proof.photo,
   });
   if (!error.value) cancelForms();
+  if (!error.value) activeTab.value = 'completed';
 };
 const openFailure = (shipment) => { cancelForms(); failureShipmentId.value = shipment.id; failure.reason = ''; failure.note = ''; };
 const reportFailure = async (shipment) => {
@@ -387,6 +546,26 @@ onBeforeUnmount(() => {
 .notifications { display: grid; gap: .4rem; padding: .85rem; margin-bottom: .8rem; border-radius: 13px; background: #fff2f7; }.notifications button { min-height: 44px; border: 0; background: transparent; color: #8b2450; text-align: left; font: inherit; }
 .empty { padding: 2rem 1rem; border-radius: 15px; background: white; text-align: center; color: #75666e; }.shipment-list { display: grid; gap: .9rem; }
 .shipment-card { display: grid; gap: .85rem; padding: 1rem; border: 1px solid #f1dce5; border-radius: 18px; background: #fff; box-shadow: 0 10px 28px rgba(50,20,35,.06); }
+.rider-tabs { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .35rem; padding: .35rem; border-radius: 14px; background: #f4edf1; }
+.rider-tabs button { display: flex; min-width: 0; min-height: 48px; align-items: center; justify-content: center; gap: .35rem; padding: .45rem; border: 0; border-radius: 10px; background: transparent; color: #65565f; font: inherit; font-size: .88rem; font-weight: 750; cursor: pointer; }
+.rider-tabs button.selected { background: white; color: #a72355; box-shadow: 0 2px 8px rgba(50,20,35,.09); }
+.rider-tabs button:focus-visible,.refresh:focus-visible { outline: 3px solid #d4146a; outline-offset: 2px; }
+.rider-tabs button span { min-width: 1.3rem; padding: .12rem .32rem; border-radius: 999px; background: #f8e2eb; font-size: .72rem; text-align: center; }
+.refresh-row { display: flex; justify-content: flex-end; }
+.refresh { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; }
+.refresh:disabled { opacity: .8; }
+.refresh-spinner { width: .9rem; height: .9rem; border: 2px solid rgba(255,255,255,.45); border-top-color: #fff; border-radius: 50%; animation: rider-refresh-spin .75s linear infinite; }
+@keyframes rider-refresh-spin { to { transform: rotate(360deg); } }
+.tab-panel { display: grid; gap: .85rem; min-width: 0; }
+.active-route-map,.map-reference-card { display: grid; gap: .75rem; padding: 1rem; border: 1px solid #f1dce5; border-radius: 16px; background: #fff; }
+.active-route-map h2,.map-reference-card h2 { margin: 0; font-size: 1.05rem; }
+.active-route-map > p { margin: 0; color: #675962; font-size: .88rem; line-height: 1.45; }
+.active-route-map > small { color: #75666e; }
+.map-reference-list { display: grid; gap: .8rem; }
+.map-reference-card .shipment-head { align-items: center; }
+.map-reference-card .shipment-head > strong { flex: 0 0 auto; color: #54263b; font-size: .85rem; }
+.navigation-link { display: inline-flex; width: fit-content; min-height: 44px; align-items: center; justify-content: center; text-align: center; text-decoration: none; }
+.completed-card .shipment-head small { display: block; margin-top: .3rem; color: #75666e; }
 .shipment-head { display: flex; justify-content: space-between; gap: 1rem; }.shipment-head h2 { font-size: 1.15rem; margin: .5rem 0 .25rem; }.shipment-head p { margin: 0; color: #675962; font-size: .88rem; }
 .shipment-code { margin-right: .5rem; color: #a72355; font-weight: 800; }.status-pill { display: inline-block; padding: .25rem .55rem; border-radius: 20px; background: #fff1f6; color: #92234e; font-size: .75rem; font-weight: 700; }
 .delivery-progress { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: .3rem; padding: 0; margin: 0; list-style: none; }
@@ -412,9 +591,11 @@ onBeforeUnmount(() => {
 .cod-warning { margin: 0; padding: .65rem; border-radius: 9px; background: #fff0dc; color: #815000; font-size: .83rem; }
 @media(max-width:600px) {
   .rider-shell { padding-inline: .8rem; }
+  .rider-tabs { gap: .2rem; padding: .25rem; }
+  .rider-tabs button { flex-direction: column; gap: .15rem; font-size: .76rem; line-height: 1.1; }
   .shipment-head { display: grid; min-width: 0; }
   .shipment-head > div { min-width: 0; overflow-wrap: anywhere; }
-  .refresh { justify-self: start; }
+  .map-reference-card .shipment-head > strong { white-space: normal; }
   .stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .workflow-actions,.form-actions { align-items: stretch; flex-direction: column; }
   .workflow-actions > button,.form-actions > button { width: 100%; }
@@ -423,5 +604,9 @@ onBeforeUnmount(() => {
   .action-form input[type=checkbox] { width: 20px; min-height: 20px; }
   .location-consent { align-items: flex-start; line-height: 1.4; }
   .delivery-progress li { font-size: .66rem; line-height: 1.2; }
+  .navigation-link { width: 100%; }
+}
+@media(prefers-reduced-motion: reduce) {
+  .refresh-spinner { animation: none; }
 }
 </style>
