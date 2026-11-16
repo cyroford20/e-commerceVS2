@@ -424,18 +424,25 @@
                 <label class="campaign-reward-toggle">
                   <input
                     type="checkbox"
-                    :checked="!!campaignForm.qualifying_order_count"
+                    :checked="campaignForm.purchase_frequency_reward"
                     @change="toggleRewardCampaign($event.target.checked)"
                   />
                   Purchase-frequency reward
                 </label>
                 <label>
-                  Completed orders required (default 5)
-                  <input v-model="campaignForm.qualifying_order_count" type="number" min="1" step="1" :disabled="!campaignForm.qualifying_order_count" />
+                  Completed orders required
+                  <input
+                    v-model="campaignForm.qualifying_order_count"
+                    type="number"
+                    min="1"
+                    step="1"
+                    :disabled="!campaignForm.purchase_frequency_reward"
+                    :required="campaignForm.purchase_frequency_reward"
+                  />
                 </label>
                 <label>
                   Qualification period
-                  <select v-model="campaignForm.qualification_period" :disabled="!campaignForm.qualifying_order_count">
+                  <select v-model="campaignForm.qualification_period" :disabled="!campaignForm.purchase_frequency_reward">
                     <option value="week">Calendar week</option>
                     <option value="month">Calendar month</option>
                   </select>
@@ -828,6 +835,7 @@ function emptyCampaignForm() {
     expires_at: '',
     max_redemptions: '',
     max_redemptions_per_customer: '1',
+    purchase_frequency_reward: false,
     qualifying_order_count: '',
     qualification_period: 'week',
     reward_expiration_days: '30',
@@ -1406,9 +1414,8 @@ const completePosSale = async () => {
 };
 
 const toggleRewardCampaign = (enabled) => {
-  campaignForm.value.qualifying_order_count = enabled
-    ? campaignForm.value.qualifying_order_count || '5'
-    : '';
+  campaignForm.value.purchase_frequency_reward = enabled;
+  if (!enabled) campaignForm.value.qualifying_order_count = '';
 };
 
 const localInputDate = (value) => {
@@ -1474,6 +1481,7 @@ const editCampaign = (campaign) => {
     expires_at: localInputDate(campaign.expires_at),
     max_redemptions: campaign.max_redemptions == null ? '' : String(campaign.max_redemptions),
     max_redemptions_per_customer: String(campaign.max_redemptions_per_customer),
+    purchase_frequency_reward: campaign.qualifying_order_count != null,
     qualifying_order_count: campaign.qualifying_order_count == null ? '' : String(campaign.qualifying_order_count),
     qualification_period: campaign.qualification_period || 'week',
     reward_expiration_days: String(campaign.reward_expiration_days),
