@@ -69,7 +69,7 @@
           </div>
           <p v-if="couponError" class="error-msg" role="alert">{{ couponError }}</p>
           <p v-else-if="couponCode.trim() && !appliedCoupon" class="zone-status" role="status">
-            Apply this code before placing your order.
+            Apply this code to use its optional discount. You can still place your order without it.
           </p>
           <p v-if="appliedCoupon" class="coupon-success" role="status">
             {{ appliedCoupon.campaign_name }} applied: PHP {{ formatPrice(appliedCoupon.discount_amount) }} off.
@@ -107,7 +107,7 @@
         <ion-button
           expand="block"
           class="ion-margin-top"
-          :disabled="loading || zonesLoading || !deliveryZoneId || !deliveryZones.length || (couponCode.trim() && !appliedCoupon)"
+          :disabled="loading || zonesLoading || !deliveryZoneId || !deliveryZones.length"
           @click="placeOrder"
         >
           {{ loading ? 'Placing Order...' : 'Place Order' }}
